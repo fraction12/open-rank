@@ -28,7 +28,15 @@ export async function saltedHash(answer: string, puzzleId: string): Promise<stri
   const key = 'ANSWER_SALT';
   const salt =
     (typeof process !== 'undefined' ? process.env[key] : undefined) ||
-    import.meta.env.ANSWER_SALT ||
+    (typeof import.meta !== 'undefined' ? import.meta.env?.ANSWER_SALT : undefined) ||
     'dev-salt-not-for-production';
+  return sha256(`${answer}:${puzzleId}:${salt}`);
+}
+
+/**
+ * Hash an answer with an explicit salt — useful for testing and scripting.
+ * Format: SHA-256(answer:puzzleId:salt)
+ */
+export async function hashAnswer(answer: string, puzzleId: string, salt: string): Promise<string> {
   return sha256(`${answer}:${puzzleId}:${salt}`);
 }

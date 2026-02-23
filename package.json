@@ -6,7 +6,9 @@
     "dev": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
-    "astro": "astro"
+    "astro": "astro",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@astrojs/vercel": "^9.0.4",
@@ -21,5 +23,8 @@
     "url": "https://github.com/fraction12/open-rank"
   },
   "license": "MIT",
-  "author": "Dushyant Garg"
+  "author": "Dushyant Garg",
+  "devDependencies": {
+    "vitest": "^4.0.18"
+  }
 }

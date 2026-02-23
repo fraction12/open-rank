@@ -25,10 +25,10 @@ const env = Object.fromEntries(
 
 const SUPABASE_URL     = env.SUPABASE_URL;
 const ANSWER_SALT      = env.ANSWER_SALT;
-const SERVICE_ROLE_KEY = env.SERVICE_ROLE_KEY;
+const SERVICE_ROLE_KEY = env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!SUPABASE_URL || !ANSWER_SALT || !SERVICE_ROLE_KEY) {
-  console.error('❌  Missing credentials. .env.local needs SUPABASE_URL, ANSWER_SALT, SERVICE_ROLE_KEY');
+  console.error('❌  Missing credentials. .env.local needs SUPABASE_URL, ANSWER_SALT, SUPABASE_SERVICE_ROLE_KEY');
   process.exit(1);
 }
 

@@ -8,6 +8,10 @@ const keyKey = 'SUPABASE_ANON_KEY';
 const supabaseUrl = (typeof process !== 'undefined' ? process.env[urlKey] : undefined) || import.meta.env.SUPABASE_URL as string | undefined;
 const supabaseAnonKey = (typeof process !== 'undefined' ? process.env[keyKey] : undefined) || import.meta.env.SUPABASE_ANON_KEY as string | undefined;
 
+// Derive the Supabase project ID dynamically so cookie names stay correct if the project changes.
+const _projectId = supabaseUrl ? new URL(supabaseUrl).hostname.split('.')[0] : 'unknown';
+export const AUTH_COOKIE_NAME = `sb-${_projectId}-auth-token`;
+
 // Graceful fallback: return null client when env vars are missing (build time)
 function createSupabaseClient() {
   if (!supabaseUrl || !supabaseAnonKey) {
@@ -43,10 +47,10 @@ export async function getCurrentUser(cookies: any) {
         // Astro cookies doesn't expose getAll, so we use a known list of Supabase cookie names
         // The main one is sb-<project>-auth-token
         const cookieNames = [
-          'sb-tpzuvnopnagnbzebfwab-auth-token',
-          'sb-tpzuvnopnagnbzebfwab-auth-token.0',
-          'sb-tpzuvnopnagnbzebfwab-auth-token.1',
-          'sb-tpzuvnopnagnbzebfwab-auth-token-code-verifier',
+          AUTH_COOKIE_NAME,
+          `${AUTH_COOKIE_NAME}.0`,
+          `${AUTH_COOKIE_NAME}.1`,
+          `${AUTH_COOKIE_NAME}-code-verifier`,
         ];
         return cookieNames
           .map(name => ({ name, value: cookies.get(name)?.value ?? '' }))

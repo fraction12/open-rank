@@ -2,6 +2,7 @@ import type { APIRoute } from 'astro';
 import { getCurrentUser, supabaseAdmin } from '../../../lib/supabase';
 import { checkRateLimit } from '../../../lib/rate-limit';
 import { corsHeaders } from '../../../lib/cors';
+import { json } from '../../../lib/response';
 
 export const OPTIONS: APIRoute = async ({ request }) => {
   return new Response(null, { status: 204, headers: corsHeaders(request) });
@@ -54,10 +55,3 @@ export const POST: APIRoute = async ({ cookies, request }) => {
   }
   return json(data, 201, cors);
 };
-
-function json(data: unknown, status: number, headers: Record<string, string> = {}) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: { 'Content-Type': 'application/json', ...headers },
-  });
-}

@@ -17,7 +17,7 @@ function loadEnv() {
 const env = loadEnv();
 const SUPABASE_URL = env.SUPABASE_URL;
 const ANSWER_SALT = env.ANSWER_SALT;
-const SERVICE_KEY = env.SERVICE_ROLE_KEY;
+const SERVICE_KEY = env.SUPABASE_SERVICE_ROLE_KEY;
 
 function saltedHash(answer, puzzleId) {
   return createHash('sha256').update(`${answer}:${puzzleId}:${ANSWER_SALT}`).digest('hex');

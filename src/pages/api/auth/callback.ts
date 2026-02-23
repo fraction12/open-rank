@@ -1,5 +1,6 @@
 import type { APIRoute } from 'astro';
 import { createServerClient } from '@supabase/ssr';
+import { AUTH_COOKIE_NAME } from '../../../lib/supabase';
 
 export const GET: APIRoute = async ({ url, cookies, redirect }) => {
   const code = url.searchParams.get('code');
@@ -12,10 +13,10 @@ export const GET: APIRoute = async ({ url, cookies, redirect }) => {
     cookies: {
       getAll: () => {
         const cookieNames = [
-          'sb-tpzuvnopnagnbzebfwab-auth-token',
-          'sb-tpzuvnopnagnbzebfwab-auth-token.0',
-          'sb-tpzuvnopnagnbzebfwab-auth-token.1',
-          'sb-tpzuvnopnagnbzebfwab-auth-token-code-verifier',
+          AUTH_COOKIE_NAME,
+          `${AUTH_COOKIE_NAME}.0`,
+          `${AUTH_COOKIE_NAME}.1`,
+          `${AUTH_COOKIE_NAME}-code-verifier`,
         ];
         return cookieNames
           .map(name => ({ name, value: cookies.get(name)?.value ?? '' }))

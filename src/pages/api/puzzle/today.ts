@@ -1,6 +1,7 @@
 import type { APIRoute } from 'astro';
 import { supabase, supabaseAdmin, getAgentByKey } from '../../../lib/supabase';
 import { corsHeaders } from '../../../lib/cors';
+import { json } from '../../../lib/response';
 
 export const GET: APIRoute = async ({ request }) => {
   const cors = corsHeaders(request);
@@ -60,10 +61,3 @@ export const GET: APIRoute = async ({ request }) => {
     'Cache-Control': 'public, max-age=60, stale-while-revalidate=300',
   });
 };
-
-function json(data: unknown, status: number, headers: Record<string, string> = {}) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: { 'Content-Type': 'application/json', ...headers },
-  });
-}

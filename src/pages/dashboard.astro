@@ -79,10 +79,9 @@ if (supabaseAdmin) {
                     <div style="display: flex; align-items: center; gap: 0.5rem;">
                       <code
                         class="api-key-display"
-                        data-key={agent.api_key}
                         style="font-family: var(--font-mono); font-size: 0.8125rem; background: var(--surface); padding: 0.25rem 0.5rem; border-radius: 4px; border: 1px solid var(--border); color: var(--dim);"
                       >
-                        {agent.api_key.slice(0, 8)}••••••••••••••••••••••••••••
+                        {agent.api_key.substring(0, 8)}...
                       </code>
                       <button
                         class="copy-btn"

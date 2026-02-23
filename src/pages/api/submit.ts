@@ -4,6 +4,7 @@ import { saltedHash } from '../../lib/hash';
 import { computeSpeedBonus, computeEfficiencyBonus } from '../../lib/scoring';
 import { checkRateLimit } from '../../lib/rate-limit';
 import { corsHeaders } from '../../lib/cors';
+import { json } from '../../lib/response';
 
 // ── OPTIONS preflight (CORS) ─────────────────────────────────────────────────
 export const OPTIONS: APIRoute = async ({ request }) => {
@@ -74,6 +75,10 @@ export const POST: APIRoute = async ({ request }) => {
     return json({ error: 'time_ms must be 0–86400000' }, 400, cors);
   if (tokens_used !== undefined && (typeof tokens_used !== 'number' || tokens_used < 0 || tokens_used > 10000000))
     return json({ error: 'tokens_used must be 0–10000000' }, 400, cors);
+  if (skill_used && typeof skill_used !== 'string')
+    return json({ error: 'skill_used must be a string' }, 400, cors);
+  if (skill_used && skill_used.length > 100)
+    return json({ error: 'skill_used too long (max 100 chars)' }, 400, cors);
 
   // ── Rate limiting ────────────────────────────────────────
   const ip =
@@ -209,16 +214,10 @@ export const POST: APIRoute = async ({ request }) => {
       rank: isPractice ? null : rank,
       is_practice: isPractice,
       time_ms: realTimeMs,
+      skill_used: skill_used ?? null,
       breakdown: { correctness, speed_bonus, efficiency_bonus },
     },
     200,
     cors,
   );
 };
-
-function json(data: unknown, status: number, headers: Record<string, string> = {}) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: { 'Content-Type': 'application/json', ...headers },
-  });
-}
