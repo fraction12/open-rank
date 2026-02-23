@@ -1,0 +1,143 @@
+---
+interface Props {
+  id: string;
+  title: string;
+  difficulty: 'easy' | 'medium' | 'hard' | 'insane';
+  description: string;
+  releaseDate?: string;
+  completionRate?: number;
+  topAgent?: string;
+  showStats?: boolean;
+}
+
+const {
+  id,
+  title,
+  difficulty,
+  description,
+  releaseDate,
+  completionRate,
+  topAgent,
+  showStats = false,
+} = Astro.props;
+
+const preview = description.length > 150 ? description.slice(0, 147) + '...' : description;
+---
+
+<article class="puzzle-card card">
+  <div class="puzzle-card-header">
+    <span class={`badge badge-${difficulty}`}>{difficulty}</span>
+    {releaseDate && (
+      <time class="puzzle-date" datetime={releaseDate}>
+        {new Date(releaseDate).toLocaleDateString('en-US', {
+          month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC',
+        })}
+      </time>
+    )}
+  </div>
+
+  <h3 class="puzzle-title">
+    <a href={`/puzzle/${id}`}>{title}</a>
+  </h3>
+
+  <p class="puzzle-preview">{preview}</p>
+
+  {showStats && (
+    <div class="puzzle-stats">
+      {completionRate != null && (
+        <span class="puzzle-stat stat-solved">
+          <span>✓</span>
+          {completionRate.toFixed(0)}% solved
+        </span>
+      )}
+      {topAgent && (
+        <span class="puzzle-stat stat-top">
+          <span>🏆</span>
+          {topAgent}
+        </span>
+      )}
+    </div>
+  )}
+
+  <a href={`/puzzle/${id}`} class="puzzle-link btn btn-primary">
+    View Puzzle →
+  </a>
+</article>
+
+<style>
+  .puzzle-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.875rem;
+  }
+
+  .puzzle-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+
+  .puzzle-date {
+    font-size: 0.8125rem;
+    color: var(--dim);
+  }
+
+  .puzzle-title {
+    font-size: 1.1875rem;
+    font-weight: 600;
+    line-height: 1.3;
+  }
+
+  .puzzle-title a {
+    color: var(--text);
+    text-decoration: none;
+    transition: color 0.15s;
+  }
+
+  .puzzle-title a:hover { color: var(--accent); }
+
+  .puzzle-preview {
+    font-size: 0.9375rem;
+    color: var(--dim);
+    line-height: 1.65;
+    flex: 1;
+  }
+
+  .puzzle-stats {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    padding-top: 0.25rem;
+    border-top: 1px solid var(--border);
+  }
+
+  .puzzle-stat {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    padding: 0.2em 0.6em;
+    border-radius: 99px;
+  }
+
+  .stat-solved {
+    background: var(--success-subtle);
+    color: var(--success);
+    border: 1px solid var(--success-subtle-border);
+  }
+
+  .stat-top {
+    background: var(--accent-subtle);
+    color: var(--accent);
+    border: 1px solid var(--accent-subtle-border);
+  }
+
+  .puzzle-link {
+    align-self: flex-start;
+    margin-top: auto;
+    font-size: 0.875rem;
+    padding: 0.5rem 1rem;
+  }
+</style>

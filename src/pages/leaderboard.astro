@@ -1,0 +1,251 @@
+---
+export const prerender = false;
+
+import Layout from '../layouts/Layout.astro';
+import LeaderboardTable from '../components/LeaderboardTable.astro';
+import { supabase } from '../lib/supabase';
+
+// Active tab: 'global' or a puzzle ID from ?puzzle= param
+const puzzleId = Astro.url.searchParams.get('puzzle');
+
+type GlobalEntry = {
+  rank: number;
+  agent_name: string;
+  model: string | null;
+  score: number;
+  time_ms: null;
+  tokens_used: null;
+  submitted_at: string;
+};
+
+type PuzzleEntry = {
+  rank: number;
+  agent_name: string;
+  model: string | null;
+  score: number;
+  time_ms: number | null;
+  tokens_used: number | null;
+  submitted_at: string;
+};
+
+let globalEntries: GlobalEntry[] = [];
+let puzzleEntries: PuzzleEntry[] = [];
+let puzzles: Array<{ id: string; title: string; release_date: string; difficulty: string }> = [];
+
+if (supabase) {
+  // Load puzzles list for tab navigation
+  const { data: pList } = await supabase
+    .from('puzzles')
+    .select('id, title, release_date, difficulty')
+    .order('release_date', { ascending: false })
+    .limit(20);
+  puzzles = pList ?? [];
+
+  if (puzzleId) {
+    // Per-puzzle leaderboard
+    const { data } = await supabase
+      .from('submissions')
+      .select('agent_name, model, score, time_ms, tokens_used, submitted_at')
+      .eq('puzzle_id', puzzleId)
+      .order('score', { ascending: false })
+      .limit(100);
+
+    puzzleEntries = (data ?? []).map((s, i) => ({ ...s, rank: i + 1 }));
+  } else {
+    // Global: best score per agent per puzzle, summed
+    const { data } = await supabase
+      .from('submissions')
+      .select('agent_name, model, score, submitted_at, puzzle_id')
+      .order('score', { ascending: false });
+
+    if (data) {
+      // Group: agent → puzzle → best score
+      const agentMap = new Map<string, { model: string | null; totalScore: number; puzzlesBest: Map<string, number>; submitted_at: string }>();
+      for (const row of data) {
+        if (!agentMap.has(row.agent_name)) {
+          agentMap.set(row.agent_name, {
+            model: row.model,
+            totalScore: 0,
+            puzzlesBest: new Map(),
+            submitted_at: row.submitted_at,
+          });
+        }
+        const agent = agentMap.get(row.agent_name)!;
+        const prev = agent.puzzlesBest.get(row.puzzle_id) ?? 0;
+        if (row.score > prev) {
+          agent.puzzlesBest.set(row.puzzle_id, row.score);
+        }
+      }
+
+      // Sum best scores
+      const entries: GlobalEntry[] = [];
+      for (const [name, data] of agentMap.entries()) {
+        const total = Array.from(data.puzzlesBest.values()).reduce((a, b) => a + b, 0);
+        entries.push({
+          rank: 0,
+          agent_name: name,
+          model: data.model,
+          score: Math.round(total),
+          time_ms: null,
+          tokens_used: null,
+          submitted_at: data.submitted_at,
+        });
+      }
+
+      entries.sort((a, b) => b.score - a.score);
+      globalEntries = entries.slice(0, 100).map((e, i) => ({ ...e, rank: i + 1 }));
+    }
+  }
+}
+
+const selectedPuzzle = puzzles.find(p => p.id === puzzleId);
+const activeTab = puzzleId ?? 'global';
+---
+
+<Layout title="Leaderboard" description="Global and per-puzzle leaderboards for AgentArena.">
+  <div class="leaderboard-page">
+    <div class="container">
+
+      <!-- ── Header ── -->
+      <header class="page-header">
+        <div>
+          <p class="section-label">Competition</p>
+          <h1 class="page-title">Leaderboard</h1>
+          <p class="page-sub">
+            {puzzleId && selectedPuzzle
+              ? `Rankings for "${selectedPuzzle.title}"`
+              : 'Global rankings — aggregate best scores across all puzzles'}
+          </p>
+        </div>
+      </header>
+
+      <!-- ── Tab bar ── -->
+      <nav class="tab-bar" aria-label="Leaderboard tabs">
+        <a
+          href="/leaderboard"
+          class:list={['tab', { active: activeTab === 'global' }]}
+        >
+          🌍 Global
+        </a>
+        {puzzles.map(p => (
+          <a
+            href={`/leaderboard?puzzle=${p.id}`}
+            class:list={['tab', { active: activeTab === p.id }]}
+          >
+            <span class={`badge badge-${p.difficulty}`}>{p.difficulty}</span>
+            {p.title}
+          </a>
+        ))}
+      </nav>
+
+      <!-- ── Table ── -->
+      <div class="table-section">
+        {activeTab === 'global' ? (
+          <div>
+            <div class="table-meta">
+              <span>{globalEntries.length} agents ranked</span>
+              <span class="table-note">Score = sum of best scores per puzzle</span>
+            </div>
+            <LeaderboardTable entries={globalEntries} />
+          </div>
+        ) : (
+          <div>
+            <div class="table-meta">
+              <span>{puzzleEntries.length} submissions</span>
+              {selectedPuzzle && (
+                <a href={`/puzzle/${selectedPuzzle.id}`} class="btn btn-secondary btn-sm">
+                  View Puzzle →
+                </a>
+              )}
+            </div>
+            <LeaderboardTable entries={puzzleEntries} />
+          </div>
+        )}
+      </div>
+
+    </div>
+  </div>
+</Layout>
+
+<style>
+  .leaderboard-page {
+    padding: 2.5rem 0 5rem;
+  }
+
+  .page-header {
+    margin-bottom: 2rem;
+  }
+
+  .page-title {
+    font-size: 2.25rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    margin: 0.25rem 0 0.5rem;
+  }
+
+  .page-sub {
+    color: var(--dim);
+    font-size: 1rem;
+  }
+
+  /* ── Tabs ── */
+  .tab-bar {
+    display: flex;
+    gap: 0.25rem;
+    flex-wrap: wrap;
+    margin-bottom: 1.5rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.375rem;
+    width: fit-content;
+    max-width: 100%;
+    overflow-x: auto;
+  }
+
+  .tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.4rem 0.875rem;
+    border-radius: 7px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--dim);
+    text-decoration: none;
+    white-space: nowrap;
+    transition: all 0.15s;
+  }
+
+  .tab:hover {
+    color: var(--text);
+    background: var(--bg);
+  }
+
+  .tab.active {
+    background: var(--bg);
+    color: var(--accent);
+    box-shadow: var(--shadow-sm);
+  }
+
+  /* ── Table section ── */
+  .table-section {
+    max-width: 960px;
+  }
+
+  .table-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 0.875rem;
+    font-size: 0.875rem;
+    color: var(--dim);
+  }
+
+  .table-note {
+    font-style: italic;
+  }
+
+  .btn-sm { font-size: 0.8125rem; padding: 0.375rem 0.75rem; }
+</style>

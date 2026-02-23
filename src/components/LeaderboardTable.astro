@@ -1,0 +1,152 @@
+---
+interface Entry {
+  rank: number;
+  agent_name: string;
+  model?: string | null;
+  score: number;
+  time_ms?: number | null;
+  tokens_used?: number | null;
+  submitted_at?: string;
+}
+
+interface Props {
+  entries: Entry[];
+  compact?: boolean;
+}
+
+const { entries, compact = false } = Astro.props;
+
+function formatTime(ms: number | null | undefined): string {
+  if (ms == null) return '—';
+  if (ms < 1000) return `${ms}ms`;
+  return `${(ms / 1000).toFixed(1)}s`;
+}
+
+function formatTokens(t: number | null | undefined): string {
+  if (t == null) return '—';
+  if (t >= 1000) return `${(t / 1000).toFixed(1)}k`;
+  return String(t);
+}
+
+function rankDisplay(rank: number): string {
+  if (rank === 1) return '🥇';
+  if (rank === 2) return '🥈';
+  if (rank === 3) return '🥉';
+  return `#${rank}`;
+}
+---
+
+{entries.length === 0 ? (
+  <div class="empty-state">
+    <span class="empty-icon">🏆</span>
+    <h3>No entries yet</h3>
+    <p>Be the first to submit a solution!</p>
+  </div>
+) : (
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th class="th-rank">Rank</th>
+          <th>Agent</th>
+          {!compact && <th>Model</th>}
+          <th>Score</th>
+          {!compact && <th>Speed</th>}
+          {!compact && <th>Tokens</th>}
+          {!compact && <th>Submitted</th>}
+        </tr>
+      </thead>
+      <tbody>
+        {entries.map(entry => (
+          <tr class:list={[{ 'row-top': entry.rank <= 3 }]}>
+            <td class="rank-cell">{rankDisplay(entry.rank)}</td>
+            <td class="agent-cell">
+              <span class="agent-name">{entry.agent_name}</span>
+            </td>
+            {!compact && (
+              <td class="model-cell">
+                <span class="model-tag">{entry.model ?? '—'}</span>
+              </td>
+            )}
+            <td class="score-cell">
+              <span class="score-pill">
+                <span class="score-value">{entry.score}</span>
+                <span class="score-max">/100</span>
+              </span>
+            </td>
+            {!compact && <td class="mono-cell">{formatTime(entry.time_ms)}</td>}
+            {!compact && <td class="mono-cell">{formatTokens(entry.tokens_used)}</td>}
+            {!compact && entry.submitted_at && (
+              <td class="mono-cell">
+                <time datetime={entry.submitted_at}>
+                  {new Date(entry.submitted_at).toLocaleDateString('en-US', {
+                    month: 'short', day: 'numeric',
+                  })}
+                </time>
+              </td>
+            )}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+)}
+
+<style>
+  /* Top-3 rows get a very subtle blue tint */
+  .row-top td {
+    background: #f8fbff;
+  }
+
+  .th-rank { width: 70px; text-align: center; }
+
+  .rank-cell {
+    text-align: center;
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: var(--dim);
+  }
+
+  .agent-name {
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .model-tag {
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    color: var(--dim);
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    padding: 0.15em 0.5em;
+    border-radius: 4px;
+  }
+
+  /* Score pill — green for success feel */
+  .score-pill {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 1px;
+    background: var(--success-subtle);
+    border: 1px solid var(--success-subtle-border);
+    border-radius: 99px;
+    padding: 0.15em 0.65em;
+  }
+
+  .score-value {
+    font-weight: 700;
+    font-size: 0.9375rem;
+    color: var(--success);
+  }
+
+  .score-max {
+    font-size: 0.7rem;
+    color: var(--dim);
+  }
+
+  .mono-cell {
+    color: var(--dim);
+    font-size: 0.875rem;
+    font-family: var(--font-mono);
+  }
+</style>

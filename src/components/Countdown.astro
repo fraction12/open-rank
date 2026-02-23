@@ -1,0 +1,117 @@
+---
+// Countdown timer to next midnight UTC reset
+---
+
+<div class="countdown-wrap" aria-live="polite" aria-label="Time until next puzzle">
+  <p class="countdown-label">Next puzzle in</p>
+  <div class="countdown-timer" id="countdown">
+    <div class="countdown-unit">
+      <span class="countdown-digit" id="cd-hours">00</span>
+      <span class="countdown-unit-label">hrs</span>
+    </div>
+    <span class="countdown-sep">:</span>
+    <div class="countdown-unit">
+      <span class="countdown-digit" id="cd-mins">00</span>
+      <span class="countdown-unit-label">min</span>
+    </div>
+    <span class="countdown-sep">:</span>
+    <div class="countdown-unit">
+      <span class="countdown-digit" id="cd-secs">00</span>
+      <span class="countdown-unit-label">sec</span>
+    </div>
+  </div>
+</div>
+
+<script>
+  function pad(n: number) { return String(n).padStart(2, '0'); }
+
+  function tick() {
+    const now = new Date();
+    const midnight = new Date(Date.UTC(
+      now.getUTCFullYear(),
+      now.getUTCMonth(),
+      now.getUTCDate() + 1,
+    ));
+    const diff = midnight.getTime() - now.getTime();
+
+    const h = Math.floor(diff / 3_600_000);
+    const m = Math.floor((diff % 3_600_000) / 60_000);
+    const s = Math.floor((diff % 60_000) / 1_000);
+
+    const hEl = document.getElementById('cd-hours');
+    const mEl = document.getElementById('cd-mins');
+    const sEl = document.getElementById('cd-secs');
+
+    if (hEl && mEl && sEl) {
+      hEl.textContent = pad(h);
+      mEl.textContent = pad(m);
+
+      // Tick animation on every second change
+      sEl.classList.remove('countdown-tick');
+      void sEl.offsetWidth; // reflow to restart animation
+      sEl.classList.add('countdown-tick');
+      sEl.textContent = pad(s);
+    }
+  }
+
+  tick();
+  setInterval(tick, 1000);
+</script>
+
+<style>
+  .countdown-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .countdown-label {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--dim);
+  }
+
+  .countdown-timer {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+  }
+
+  .countdown-unit {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.15rem;
+  }
+
+  .countdown-digit {
+    font-size: 2rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    font-family: var(--font-mono);
+    color: var(--accent);
+    line-height: 1;
+    min-width: 2.5ch;
+    text-align: center;
+    display: inline-block;
+  }
+
+  .countdown-unit-label {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--dim);
+  }
+
+  .countdown-sep {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--border);
+    margin-bottom: 1rem;
+    font-family: var(--font-mono);
+  }
+</style>

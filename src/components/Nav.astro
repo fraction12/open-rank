@@ -1,0 +1,179 @@
+---
+const navLinks = [
+  { href: '/', label: 'Home' },
+  { href: '/leaderboard', label: 'Leaderboard' },
+  { href: '/archive', label: 'Archive' },
+  { href: '/docs', label: 'API Docs' },
+];
+
+const currentPath = Astro.url.pathname;
+---
+
+<nav class="nav" role="navigation" aria-label="Main navigation">
+  <div class="container nav-inner">
+    <a href="/" class="nav-logo" aria-label="AgentArena home">
+      <span class="nav-logo-icon">⚡</span>
+      <span class="nav-logo-text">AgentArena</span>
+    </a>
+
+    <button class="nav-toggle" aria-label="Toggle menu" aria-expanded="false" aria-controls="nav-menu">
+      <span></span><span></span><span></span>
+    </button>
+
+    <ul class="nav-links" id="nav-menu" role="list">
+      {navLinks.map(link => (
+        <li>
+          <a
+            href={link.href}
+            class:list={['nav-link', { active: currentPath === link.href }]}
+            aria-current={currentPath === link.href ? 'page' : undefined}
+          >
+            {link.label}
+          </a>
+        </li>
+      ))}
+    </ul>
+
+    <a href="/docs#api" class="btn btn-primary nav-cta">
+      Use API →
+    </a>
+  </div>
+</nav>
+
+<script>
+  const toggle = document.querySelector('.nav-toggle') as HTMLButtonElement;
+  const menu = document.querySelector('.nav-links') as HTMLElement;
+
+  toggle?.addEventListener('click', () => {
+    const isOpen = toggle.getAttribute('aria-expanded') === 'true';
+    toggle.setAttribute('aria-expanded', String(!isOpen));
+    menu.classList.toggle('open');
+  });
+</script>
+
+<style>
+  .nav {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    /* White with very subtle blur — crisp light nav */
+    background: rgba(255, 255, 255, 0.92);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    height: var(--nav-height);
+  }
+
+  .nav-inner {
+    display: flex;
+    align-items: center;
+    gap: 2rem;
+    height: 100%;
+  }
+
+  .nav-logo {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--text);
+    text-decoration: none;
+    flex-shrink: 0;
+    transition: color 0.15s;
+  }
+
+  .nav-logo:hover { color: var(--accent); }
+
+  .nav-logo-icon {
+    font-size: 1.25rem;
+  }
+
+  .nav-links {
+    display: flex;
+    align-items: center;
+    gap: 0.125rem;
+    list-style: none;
+    margin-left: auto;
+  }
+
+  .nav-link {
+    padding: 0.4rem 0.75rem;
+    border-radius: 8px;
+    font-size: 0.9375rem;
+    font-weight: 500;
+    color: var(--dim);
+    text-decoration: none;
+    transition: color 0.15s, background 0.15s;
+  }
+
+  .nav-link:hover {
+    color: var(--text);
+    background: var(--surface);
+  }
+
+  .nav-link.active {
+    color: var(--accent);
+    background: var(--accent-subtle);
+  }
+
+  .nav-cta {
+    flex-shrink: 0;
+    font-size: 0.875rem;
+    padding: 0.45rem 1rem;
+  }
+
+  /* ── Mobile hamburger ── */
+  .nav-toggle {
+    display: none;
+    flex-direction: column;
+    gap: 4px;
+    background: none;
+    border: none;
+    padding: 6px;
+    margin-left: auto;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: background 0.15s;
+  }
+
+  .nav-toggle:hover { background: var(--surface); }
+
+  .nav-toggle span {
+    display: block;
+    width: 20px;
+    height: 2px;
+    background: var(--text);
+    border-radius: 2px;
+    transition: all 0.2s;
+  }
+
+  @media (max-width: 768px) {
+    .nav-toggle { display: flex; }
+    .nav-cta    { display: none; }
+
+    .nav-links {
+      display: none;
+      position: absolute;
+      top: var(--nav-height);
+      left: 0;
+      right: 0;
+      /* White dropdown on mobile */
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      box-shadow: var(--shadow-md);
+      flex-direction: column;
+      align-items: stretch;
+      padding: 0.5rem 0.75rem 0.75rem;
+      gap: 0.125rem;
+      margin-left: 0;
+    }
+
+    .nav-links.open { display: flex; }
+
+    .nav-link {
+      padding: 0.625rem 0.75rem;
+      font-size: 1rem;
+    }
+  }
+</style>

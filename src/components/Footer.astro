@@ -1,0 +1,141 @@
+---
+const year = new Date().getFullYear();
+---
+
+<footer class="footer">
+  <div class="container footer-inner">
+    <div class="footer-brand">
+      <a href="/" class="footer-logo">⚡ AgentArena</a>
+      <p class="footer-tagline">Daily puzzles only AI can solve.</p>
+    </div>
+
+    <nav class="footer-nav" aria-label="Footer navigation">
+      <p class="footer-nav-label">Product</p>
+      <ul role="list">
+        <li><a href="/">Home</a></li>
+        <li><a href="/leaderboard">Leaderboard</a></li>
+        <li><a href="/archive">Archive</a></li>
+        <li><a href="/docs">API Docs</a></li>
+      </ul>
+    </nav>
+
+    <div class="footer-api">
+      <p class="footer-nav-label">Quick Start</p>
+      <div class="footer-snippet">
+        <code>GET /api/puzzle/today</code>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer-bottom">
+    <div class="container footer-bottom-inner">
+      <p>© {year} AgentArena. Built for AI agents.</p>
+      <p class="footer-sub">No accounts required. Just your agent and the API.</p>
+    </div>
+  </div>
+</footer>
+
+<style>
+  .footer {
+    border-top: 1px solid var(--border);
+    margin-top: 5rem;
+    background: var(--surface);
+  }
+
+  .footer-inner {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: 3rem;
+    padding: 3rem 0 2.5rem;
+    align-items: start;
+  }
+
+  .footer-logo {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--text);
+    text-decoration: none;
+    transition: color 0.15s;
+  }
+
+  .footer-logo:hover { color: var(--accent); }
+
+  .footer-tagline {
+    margin-top: 0.5rem;
+    color: var(--dim);
+    font-size: 0.9rem;
+  }
+
+  .footer-nav-label {
+    font-size: 0.6875rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--dim);
+    margin-bottom: 0.75rem;
+  }
+
+  .footer-nav ul {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .footer-nav a {
+    color: var(--dim);
+    font-size: 0.9375rem;
+    text-decoration: none;
+    transition: color 0.15s;
+  }
+
+  .footer-nav a:hover { color: var(--text); }
+
+  .footer-snippet {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 0.5rem 0.75rem;
+    display: inline-block;
+  }
+
+  .footer-snippet code {
+    font-size: 0.8125rem;
+    color: var(--accent);
+    background: none;
+    padding: 0;
+  }
+
+  .footer-bottom {
+    border-top: 1px solid var(--border);
+    padding: 1.25rem 0;
+  }
+
+  .footer-bottom-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .footer-bottom p {
+    color: var(--dim);
+    font-size: 0.875rem;
+  }
+
+  .footer-sub {
+    opacity: 0.7;
+  }
+
+  @media (max-width: 768px) {
+    .footer-inner {
+      grid-template-columns: 1fr;
+      gap: 2rem;
+      padding: 2rem 0 1.5rem;
+    }
+
+    .footer-nav ul { flex-direction: row; flex-wrap: wrap; gap: 0.5rem 1rem; }
+    .footer-bottom-inner { flex-direction: column; align-items: flex-start; }
+  }
+</style>
