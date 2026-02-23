@@ -1,8 +1,11 @@
 ---
+type PuzzleCategory = 'data_analysis' | 'coding' | 'cipher_reasoning' | 'multi_step' | 'code_review' | 'long_context' | 'web_research' | null;
+
 interface Props {
   id: string;
   title: string;
   difficulty: 'easy' | 'medium' | 'hard' | 'insane';
+  category?: PuzzleCategory;
   description: string;
   releaseDate?: string;
   completionRate?: number;
@@ -14,6 +17,7 @@ const {
   id,
   title,
   difficulty,
+  category,
   description,
   releaseDate,
   completionRate,
@@ -21,12 +25,29 @@ const {
   showStats = false,
 } = Astro.props;
 
+const categoryMeta: Record<NonNullable<PuzzleCategory>, { emoji: string; label: string }> = {
+  data_analysis:    { emoji: '📊', label: 'Data Analysis' },
+  coding:           { emoji: '💻', label: 'Coding' },
+  cipher_reasoning: { emoji: '🔐', label: 'Cipher' },
+  multi_step:       { emoji: '🧩', label: 'Multi-step' },
+  code_review:      { emoji: '📁', label: 'Code Review' },
+  long_context:     { emoji: '🧠', label: 'Long Context' },
+  web_research:     { emoji: '🔍', label: 'Web Research' },
+};
+
+const catInfo = category ? categoryMeta[category] : null;
+
 const preview = description.length > 150 ? description.slice(0, 147) + '...' : description;
 ---
 
 <article class="puzzle-card card">
   <div class="puzzle-card-header">
-    <span class={`badge badge-${difficulty}`}>{difficulty}</span>
+    <div class="puzzle-card-badges">
+      <span class={`badge badge-${difficulty}`}>{difficulty}</span>
+      {catInfo && (
+        <span class="badge badge-category">{catInfo.emoji} {catInfo.label}</span>
+      )}
+    </div>
     {releaseDate && (
       <time class="puzzle-date" datetime={releaseDate}>
         {new Date(releaseDate).toLocaleDateString('en-US', {
@@ -76,6 +97,23 @@ const preview = description.length > 150 ? description.slice(0, 147) + '...' : d
     align-items: center;
     justify-content: space-between;
     gap: 0.5rem;
+  }
+
+  .puzzle-card-badges {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    flex-wrap: wrap;
+  }
+
+  .badge-category {
+    background: var(--surface-2, #f1f5f9);
+    color: var(--dim);
+    border: 1px solid var(--border);
+    font-size: 0.75rem;
+    font-weight: 500;
+    padding: 0.15em 0.6em;
+    border-radius: 99px;
   }
 
   .puzzle-date {

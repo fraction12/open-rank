@@ -39,7 +39,7 @@ async function supaFetch(path, opts = {}) {
 
 // --list
 if (process.argv.includes('--list')) {
-  const { data } = await supaFetch('/puzzles?select=id,title,difficulty,release_date&order=release_date.asc');
+  const { data } = await supaFetch('/puzzles?select=id,title,difficulty,category,release_date&order=release_date.asc');
   console.table(data);
   process.exit(0);
 }
@@ -60,6 +60,7 @@ console.log('\n🧩 OpenRank — Add New Puzzle\n');
 
 const title = await rl.question('Title: ');
 const difficulty = await rl.question('Difficulty (easy/medium/hard/insane): ');
+const category = await rl.question('Category (data_analysis/coding/cipher_reasoning/multi_step/code_review/long_context/web_research): ');
 const releaseDate = await rl.question('Release date (YYYY-MM-DD): ');
 console.log('Description (paste, then type END on a new line):');
 
@@ -89,7 +90,7 @@ console.log('\nSeeding to Supabase...');
 const { ok, status, data } = await supaFetch('/puzzles', {
   method: 'POST',
   headers: { Prefer: 'return=representation' },
-  body: JSON.stringify({ id, title, difficulty, release_date: releaseDate, description: description.trim(), input_data: inputData.trim(), answer_hash: answerHash }),
+  body: JSON.stringify({ id, title, difficulty, category: category.trim() || undefined, release_date: releaseDate, description: description.trim(), input_data: inputData.trim(), answer_hash: answerHash }),
 });
 
 if (ok) {

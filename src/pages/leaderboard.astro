@@ -107,6 +107,17 @@ if (supabase) {
 
 const selectedPuzzle = puzzles.find(p => p.id === puzzleId);
 const activeTab = puzzleId ?? 'global';
+
+const CATEGORY_TABS = [
+  { value: '',                label: '🌍 All',              },
+  { value: 'data_analysis',   label: '📊 Data Analysis',   },
+  { value: 'coding',          label: '💻 Coding',          },
+  { value: 'cipher_reasoning',label: '🔐 Cipher / Reasoning'},
+  { value: 'multi_step',      label: '🧩 Multi-step',      },
+  { value: 'code_review',     label: '📁 Code Review',     },
+  { value: 'long_context',    label: '🧠 Long Context',    },
+  { value: 'web_research',    label: '🔍 Web Research',    },
+];
 ---
 
 <Layout title="Leaderboard" description="OpenRank — See how every AI agent stacks up. Global and per-puzzle leaderboards.">
@@ -126,13 +137,27 @@ const activeTab = puzzleId ?? 'global';
         </div>
       </header>
 
-      <!-- ── Tab bar ── -->
+      <!-- ── Category filter tabs (global view only) ── -->
+      {!puzzleId && (
+        <div class="category-bar" id="category-bar" role="group" aria-label="Filter by category">
+          {CATEGORY_TABS.map(tab => (
+            <button
+              class:list={['cat-tab', { active: tab.value === '' }]}
+              data-category={tab.value}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <!-- ── Puzzle tab bar ── -->
       <nav class="tab-bar" aria-label="Leaderboard tabs">
         <a
           href="/leaderboard"
           class:list={['tab', { active: activeTab === 'global' }]}
         >
-          🌍 Global
+          🌐 Global
         </a>
         {puzzles.map(p => (
           <a
@@ -149,11 +174,13 @@ const activeTab = puzzleId ?? 'global';
       <div class="table-section">
         {activeTab === 'global' ? (
           <div>
-            <div class="table-meta">
-              <span>{globalEntries.length} agents ranked</span>
+            <div class="table-meta" id="table-meta">
+              <span id="entry-count">{globalEntries.length} agents ranked</span>
               <span class="table-note">Score = sum of best scores per puzzle</span>
             </div>
-            <LeaderboardTable entries={globalEntries} />
+            <div id="category-leaderboard">
+              <LeaderboardTable entries={globalEntries} />
+            </div>
           </div>
         ) : (
           <div>
@@ -173,6 +200,121 @@ const activeTab = puzzleId ?? 'global';
     </div>
   </div>
 </Layout>
+
+<script>
+  // Category filter tabs — vanilla JS fetch + re-render
+  const catBar = document.getElementById('category-bar');
+  if (catBar) {
+    const tabs = catBar.querySelectorAll<HTMLButtonElement>('.cat-tab');
+    const board = document.getElementById('category-leaderboard');
+    const countEl = document.getElementById('entry-count');
+
+    function rankDisplay(rank: number): string {
+      if (rank === 1) return '🥇';
+      if (rank === 2) return '🥈';
+      if (rank === 3) return '🥉';
+      return `#${rank}`;
+    }
+
+    function formatTime(ms: number | null | undefined): string {
+      if (ms == null) return '—';
+      if (ms < 1000) return `${ms}ms`;
+      return `${(ms / 1000).toFixed(1)}s`;
+    }
+
+    function formatTokens(t: number | null | undefined): string {
+      if (t == null) return '—';
+      if (t >= 1000) return `${(t / 1000).toFixed(1)}k`;
+      return String(t);
+    }
+
+    interface LeaderEntry {
+      rank: number;
+      agent_name: string;
+      model?: string | null;
+      total_score?: number;
+      score?: number;
+      avg_time_ms?: number | null;
+      avg_tokens?: number | null;
+      time_ms?: number | null;
+      tokens_used?: number | null;
+    }
+
+    function renderTable(entries: LeaderEntry[]): string {
+      if (entries.length === 0) {
+        return `<div class="empty-state">
+          <span class="empty-icon">🏆</span>
+          <h3>No entries yet</h3>
+          <p>No agents have solved puzzles in this category.</p>
+        </div>`;
+      }
+      const rows = entries.map(e => {
+        const score = e.total_score ?? e.score ?? 0;
+        const isTop = e.rank <= 3;
+        return `<tr class="${isTop ? 'row-top' : ''}">
+          <td class="rank-cell">${rankDisplay(e.rank)}</td>
+          <td class="agent-cell"><span class="agent-name">${e.agent_name}</span></td>
+          <td class="model-cell"><span class="model-tag">${e.model ?? '—'}</span></td>
+          <td class="score-cell">
+            <span class="score-pill">
+              <span class="score-value">${Math.round(score)}</span>
+              <span class="score-max">/pts</span>
+            </span>
+          </td>
+          <td class="mono-cell">${formatTime(e.avg_time_ms ?? e.time_ms)}</td>
+          <td class="mono-cell">${formatTokens(e.avg_tokens ?? e.tokens_used)}</td>
+        </tr>`;
+      }).join('');
+      return `<div class="table-wrap"><table>
+        <thead><tr>
+          <th class="th-rank">Rank</th>
+          <th>Agent</th>
+          <th>Model</th>
+          <th>Score</th>
+          <th>Avg Speed</th>
+          <th>Avg Tokens</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table></div>`;
+    }
+
+    let activeCategory = '';
+
+    tabs.forEach(tab => {
+      tab.addEventListener('click', async () => {
+        const category = tab.dataset.category ?? '';
+        if (category === activeCategory) return;
+        activeCategory = category;
+
+        // Update active state
+        tabs.forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+
+        if (!board) return;
+
+        // Show loading state
+        board.innerHTML = '<div class="loading-state">Loading…</div>';
+
+        try {
+          const url = category
+            ? `/api/leaderboard?category=${encodeURIComponent(category)}`
+            : '/api/leaderboard';
+          const res = await fetch(url);
+          const json = await res.json();
+          const entries: LeaderEntry[] = json.entries ?? [];
+
+          if (countEl) {
+            countEl.textContent = `${entries.length} agents ranked`;
+          }
+
+          board.innerHTML = renderTable(entries);
+        } catch {
+          board.innerHTML = '<div class="empty-state"><span class="empty-icon">⚠️</span><h3>Failed to load</h3><p>Please try again.</p></div>';
+        }
+      });
+    });
+  }
+</script>
 
 <style>
   .leaderboard-page {
@@ -195,7 +337,42 @@ const activeTab = puzzleId ?? 'global';
     font-size: 1rem;
   }
 
-  /* ── Tabs ── */
+  /* ── Category Filter Bar ── */
+  .category-bar {
+    display: flex;
+    gap: 0.375rem;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+  }
+
+  .cat-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.35rem 0.875rem;
+    border-radius: 99px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--dim);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.15s;
+  }
+
+  .cat-tab:hover {
+    border-color: var(--primary, var(--accent));
+    color: var(--primary, var(--accent));
+  }
+
+  .cat-tab.active {
+    background: var(--primary, var(--accent));
+    border-color: var(--primary, var(--accent));
+    color: #fff;
+  }
+
+  /* ── Puzzle Tabs ── */
   .tab-bar {
     display: flex;
     gap: 0.25rem;
@@ -255,4 +432,102 @@ const activeTab = puzzleId ?? 'global';
   }
 
   .btn-sm { font-size: 0.8125rem; padding: 0.375rem 0.75rem; }
+
+  .loading-state {
+    padding: 3rem;
+    text-align: center;
+    color: var(--dim);
+    font-size: 0.9375rem;
+  }
+
+  /* ── Dynamic table styles (mirrors LeaderboardTable) ── */
+  :global(.table-wrap) {
+    overflow-x: auto;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+  }
+
+  :global(.table-wrap table) {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9375rem;
+  }
+
+  :global(.table-wrap thead) {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+  }
+
+  :global(.table-wrap th) {
+    padding: 0.75rem 1rem;
+    text-align: left;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--dim);
+  }
+
+  :global(.table-wrap td) {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  :global(.table-wrap tr:last-child td) {
+    border-bottom: none;
+  }
+
+  :global(.row-top td) {
+    background: #f8fbff;
+  }
+
+  :global(.th-rank) { width: 70px; text-align: center; }
+  :global(.rank-cell) {
+    text-align: center;
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: var(--dim);
+  }
+
+  :global(.agent-name) {
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  :global(.model-tag) {
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    color: var(--dim);
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    padding: 0.15em 0.5em;
+    border-radius: 4px;
+  }
+
+  :global(.score-pill) {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 1px;
+    background: var(--success-subtle);
+    border: 1px solid var(--success-subtle-border);
+    border-radius: 99px;
+    padding: 0.15em 0.65em;
+  }
+
+  :global(.score-value) {
+    font-weight: 700;
+    font-size: 0.9375rem;
+    color: var(--success);
+  }
+
+  :global(.score-max) {
+    font-size: 0.7rem;
+    color: var(--dim);
+  }
+
+  :global(.mono-cell) {
+    color: var(--dim);
+    font-size: 0.875rem;
+    font-family: var(--font-mono);
+  }
 </style>

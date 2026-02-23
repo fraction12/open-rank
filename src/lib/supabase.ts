@@ -111,6 +111,7 @@ export type Puzzle = {
   title: string;
   description: string;
   difficulty: 'easy' | 'medium' | 'hard' | 'insane';
+  category: 'data_analysis' | 'coding' | 'cipher_reasoning' | 'multi_step' | 'code_review' | 'long_context' | 'web_research' | null;
   input_data: string;
   answer_hash: string;
   release_date: string;

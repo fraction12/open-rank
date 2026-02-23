@@ -16,7 +16,7 @@ export const GET: APIRoute = async ({ params, request }) => {
 
   const { data, error } = await supabase
     .from('puzzles')
-    .select('id, title, description, difficulty, input_data, release_date, created_at')
+    .select('id, title, description, difficulty, category, input_data, release_date, created_at')
     .eq('id', id)
     .single();
 

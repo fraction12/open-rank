@@ -10,6 +10,7 @@ type PuzzleWithStats = {
   title: string;
   description: string;
   difficulty: 'easy' | 'medium' | 'hard' | 'insane';
+  category: 'data_analysis' | 'coding' | 'cipher_reasoning' | 'multi_step' | 'code_review' | 'long_context' | 'web_research' | null;
   release_date: string;
   completionRate?: number;
   topAgent?: string;
@@ -22,7 +23,7 @@ if (supabase) {
 
   const { data } = await supabase
     .from('puzzles')
-    .select('id, title, description, difficulty, release_date')
+    .select('id, title, description, difficulty, category, release_date')
     .lte('release_date', today)
     .order('release_date', { ascending: false });
 
@@ -97,6 +98,7 @@ type Difficulty = typeof difficulties[number];
                 id={p.id}
                 title={p.title}
                 difficulty={p.difficulty}
+                category={p.category}
                 description={p.description}
                 releaseDate={p.release_date}
                 completionRate={p.completionRate}

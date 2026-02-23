@@ -13,7 +13,7 @@ export const GET: APIRoute = async ({ request }) => {
 
   const { data, error } = await supabase
     .from('puzzles')
-    .select('id, title, description, difficulty, input_data, release_date, created_at')
+    .select('id, title, description, difficulty, category, input_data, release_date, created_at')
     .eq('release_date', today)
     .single();
 
