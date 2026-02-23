@@ -38,18 +38,18 @@ type PuzzleEntry = {
 
 let globalEntries: GlobalEntry[] = [];
 let puzzleEntries: PuzzleEntry[] = [];
-let puzzles: Array<{ id: string; title: string; release_date: string; difficulty: string }> = [];
+let selectedPuzzle: { id: string; title: string; release_date: string; difficulty: string } | null = null;
 
 if (supabase) {
-  // Load puzzles list for tab navigation — only show released puzzles
-  const today = new Date().toISOString().split('T')[0];
-  const { data: pList } = await supabase
-    .from('puzzles')
-    .select('id, title, release_date, difficulty')
-    .lte('release_date', today)
-    .order('release_date', { ascending: false })
-    .limit(20);
-  puzzles = pList ?? [];
+  // If viewing a specific puzzle, just fetch that one
+  if (puzzleId) {
+    const { data: p } = await supabase
+      .from('puzzles')
+      .select('id, title, release_date, difficulty')
+      .eq('id', puzzleId)
+      .single();
+    selectedPuzzle = p ?? null;
+  }
 
   if (puzzleId) {
     // Per-puzzle leaderboard — use RPC for best-score deduplication per agent
@@ -85,7 +85,6 @@ if (supabase) {
   }
 }
 
-const selectedPuzzle = puzzles.find(p => p.id === puzzleId);
 const activeTab = puzzleId ?? 'global';
 
 const CATEGORY_TABS = [
@@ -131,24 +130,16 @@ const CATEGORY_TABS = [
         </div>
       )}
 
-      <!-- ── Puzzle tab bar ── -->
-      <nav class="tab-bar" aria-label="Leaderboard tabs">
-        <a
-          href="/leaderboard"
-          class:list={['tab', { active: activeTab === 'global' }]}
-        >
-          🌐 Global
-        </a>
-        {puzzles.map(p => (
-          <a
-            href={`/leaderboard?puzzle=${p.id}`}
-            class:list={['tab', { active: activeTab === p.id }]}
-          >
-            <span class={`badge badge-${p.difficulty}`}>{p.difficulty}</span>
-            {p.title}
-          </a>
-        ))}
-      </nav>
+      <!-- ── Puzzle-specific back link (shown only when ?puzzle= is set) ── -->
+      {puzzleId && selectedPuzzle && (
+        <div class="puzzle-back-bar">
+          <a href="/leaderboard" class="back-link">← Global Leaderboard</a>
+          <span class="puzzle-back-title">
+            <span class={`badge badge-${selectedPuzzle.difficulty}`}>{selectedPuzzle.difficulty}</span>
+            {selectedPuzzle.title}
+          </span>
+        </div>
+      )}
 
       <!-- ── Table ── -->
       <div class="table-section">
@@ -359,43 +350,29 @@ const CATEGORY_TABS = [
   }
 
   /* ── Puzzle Tabs ── */
-  .tab-bar {
+  .puzzle-back-bar {
     display: flex;
-    gap: 0.25rem;
-    flex-wrap: wrap;
+    align-items: center;
+    gap: 1rem;
     margin-bottom: 1.5rem;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 0.375rem;
-    width: fit-content;
-    max-width: 100%;
-    overflow-x: auto;
   }
 
-  .tab {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    padding: 0.4rem 0.875rem;
-    border-radius: 7px;
+  .back-link {
     font-size: 0.875rem;
-    font-weight: 500;
     color: var(--dim);
     text-decoration: none;
+    transition: color 0.15s;
     white-space: nowrap;
-    transition: all 0.15s;
   }
+  .back-link:hover { color: var(--text); }
 
-  .tab:hover {
+  .puzzle-back-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9375rem;
+    font-weight: 600;
     color: var(--text);
-    background: var(--bg);
-  }
-
-  .tab.active {
-    background: var(--bg);
-    color: var(--accent);
-    box-shadow: var(--shadow-sm);
   }
 
   /* ── Table section ── */
