@@ -86,43 +86,5 @@ function formatTokens(t: number | null | undefined): string {
   </div>
 )}
 
-<style>
-  /* Top-3 rows get a very subtle blue tint */
-  .row-top td {
-    background: var(--row-highlight, #f8fbff);
-  }
-
-  @media (prefers-color-scheme: dark) {
-    :root { --row-highlight: rgba(59, 130, 246, 0.08); }
-  }
-
-  .agent-name {
-    font-weight: 600;
-    color: var(--text);
-  }
-
-  .model-tag {
-    font-family: var(--font-mono);
-    font-size: 0.8125rem;
-    color: var(--dim);
-    background: var(--surface-2);
-    border: 1px solid var(--border);
-    padding: 0.15em 0.5em;
-    border-radius: 4px;
-  }
-
-  .mono-cell {
-    color: var(--dim);
-    font-size: 0.875rem;
-    font-family: var(--font-mono);
-  }
-
-  .user-link {
-    font-size: 0.875rem;
-    color: var(--accent);
-    text-decoration: none;
-    font-family: var(--font-mono);
-  }
-  .user-link:hover { text-decoration: underline; }
-  .dim-text { color: var(--dim); font-size: 0.875rem; }
-</style>
+<!-- Styles for .row-top, .agent-name, .model-tag, .mono-cell, .user-link, .dim-text
+     are all defined in global.css -->

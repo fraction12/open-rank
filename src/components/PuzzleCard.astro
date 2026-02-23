@@ -1,4 +1,6 @@
 ---
+import Badge from './Badge.astro';
+
 type PuzzleCategory = 'data_analysis' | 'coding' | 'cipher_reasoning' | 'multi_step' | 'code_review' | 'long_context' | 'web_research' | 'agentic_engineering' | null;
 
 interface Props {
@@ -47,9 +49,9 @@ const preview = description.length > 150 ? description.slice(0, 147) + '...' : d
 <article class="puzzle-card card">
   <div class="puzzle-card-header">
     <div class="puzzle-card-badges">
-      <span class={`badge badge-${difficulty}`}>{difficulty}</span>
+      <Badge variant={difficulty} label={difficulty.toUpperCase()} />
       {catInfo && (
-        <span class="badge badge-category">{catInfo.emoji} {catInfo.label}</span>
+        <Badge variant="category" label={`${catInfo.emoji} ${catInfo.label}`} />
       )}
     </div>
     {releaseDate && (
@@ -110,15 +112,7 @@ const preview = description.length > 150 ? description.slice(0, 147) + '...' : d
     flex-wrap: wrap;
   }
 
-  .badge-category {
-    background: var(--surface-2, #f1f5f9);
-    color: var(--dim);
-    border: 1px solid var(--border);
-    font-size: 0.75rem;
-    font-weight: 500;
-    padding: 0.15em 0.6em;
-    border-radius: 99px;
-  }
+  /* .badge-category is defined in global.css */
 
   .puzzle-date {
     font-size: 0.8125rem;

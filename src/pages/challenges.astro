@@ -3,6 +3,8 @@ export const prerender = false;
 
 import Layout from '../layouts/Layout.astro';
 import PuzzleCard from '../components/PuzzleCard.astro';
+import PageHeader from '../components/PageHeader.astro';
+import EmptyState from '../components/EmptyState.astro';
 import { supabaseAdmin } from '../lib/supabase';
 
 type PuzzleWithStats = {
@@ -57,11 +59,11 @@ if (supabaseAdmin) {
     <div class="container">
 
       <!-- ── Header ── -->
-      <header class="page-header">
-        <p class="section-label">Challenges</p>
-        <h1 class="page-title">Test Your AI Skills</h1>
-        <p class="page-sub">Real engineering problems. Your AI tools. Compete against humans.</p>
-      </header>
+      <PageHeader
+        label="Challenges"
+        title="Test Your AI Skills"
+        sub="Real engineering problems. Your AI tools. Compete against humans."
+      />
 
       <!-- ── How It Works ── -->
       <section class="how-it-works" aria-label="How it works">
@@ -100,11 +102,7 @@ if (supabaseAdmin) {
         </div>
 
         {challenges.length === 0 ? (
-          <div class="empty-state">
-            <span class="empty-icon">🛠️</span>
-            <h3>No challenges yet</h3>
-            <p>Agentic engineering challenges are coming soon. Check back shortly.</p>
-          </div>
+          <EmptyState icon="🛠️" title="No challenges yet" body="Agentic engineering challenges are coming soon. Check back shortly." />
         ) : (
           <div class="challenge-grid">
             {challenges.map((c, i) => (
@@ -148,22 +146,7 @@ if (supabaseAdmin) {
     padding: 2.5rem 0 5rem;
   }
 
-  .page-header {
-    margin-bottom: 2.5rem;
-  }
-
-  .page-title {
-    font-size: 2.5rem;
-    font-weight: 800;
-    letter-spacing: -0.02em;
-    margin: 0.25rem 0 0.5rem;
-    color: var(--text);
-  }
-
-  .page-sub {
-    color: var(--dim);
-    font-size: 1.0625rem;
-  }
+  /* .page-header, .page-title, .page-sub are in global.css */
 
   /* ── How It Works ── */
   .how-it-works {
@@ -230,18 +213,15 @@ if (supabaseAdmin) {
     line-height: 1;
   }
 
-  /* ── Section header ── */
+  /* ── Section header (page-specific override: tighter margin + baseline align) ── */
   .section-header {
-    display: flex;
     align-items: baseline;
-    gap: 1rem;
     margin-bottom: 1.5rem;
   }
 
+  /* .section-title is in global.css; local override for smaller size on this page */
   .section-title {
     font-size: 1.375rem;
-    font-weight: 700;
-    color: var(--text);
     margin: 0;
   }
 
@@ -258,29 +238,7 @@ if (supabaseAdmin) {
     gap: 1.5rem;
   }
 
-  /* ── Empty state ── */
-  .empty-state {
-    text-align: center;
-    padding: 4rem 2rem;
-    color: var(--dim);
-  }
-
-  .empty-icon {
-    font-size: 3rem;
-    display: block;
-    margin-bottom: 1rem;
-  }
-
-  .empty-state h3 {
-    font-size: 1.25rem;
-    font-weight: 700;
-    color: var(--text);
-    margin-bottom: 0.5rem;
-  }
-
-  .empty-state p {
-    font-size: 0.9375rem;
-  }
+  /* .empty-state, .empty-icon are in global.css */
 
   /* ── Leaderboard CTA ── */
   .leaderboard-cta {

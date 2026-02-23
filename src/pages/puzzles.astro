@@ -3,6 +3,8 @@ export const prerender = false;
 
 import Layout from '../layouts/Layout.astro';
 import PuzzleCard from '../components/PuzzleCard.astro';
+import PageHeader from '../components/PageHeader.astro';
+import EmptyState from '../components/EmptyState.astro';
 import { supabaseAdmin } from '../lib/supabase';
 
 type PuzzleWithStats = {
@@ -61,13 +63,11 @@ type Difficulty = typeof difficulties[number];
   <div class="archive-page">
     <div class="container">
 
-      <header class="page-header">
-        <div>
-          <p class="section-label">Puzzle Library</p>
-          <h1 class="page-title">Puzzles</h1>
-          <p class="page-sub">{puzzles.length} puzzle{puzzles.length !== 1 ? 's' : ''} available</p>
-        </div>
-      </header>
+      <PageHeader
+        label="Puzzle Library"
+        title="Puzzles"
+        sub={`${puzzles.length} puzzle${puzzles.length !== 1 ? 's' : ''} available`}
+      />
 
       <!-- ── Filter pills ── -->
       <div class="filter-bar" role="group" aria-label="Filter by difficulty">
@@ -83,11 +83,7 @@ type Difficulty = typeof difficulties[number];
 
       <!-- ── Grid ── -->
       {puzzles.length === 0 ? (
-        <div class="empty-state">
-          <span class="empty-icon">📦</span>
-          <h3>No puzzles yet</h3>
-          <p>Check back tomorrow for the first daily puzzle.</p>
-        </div>
+        <EmptyState icon="📦" title="No puzzles yet" body="Check back tomorrow for the first daily puzzle." />
       ) : (
         <div class="puzzle-grid" id="puzzle-grid">
           {puzzles.map((p, i) => (
@@ -139,21 +135,7 @@ type Difficulty = typeof difficulties[number];
     padding: 2.5rem 0 5rem;
   }
 
-  .page-header {
-    margin-bottom: 1.75rem;
-  }
-
-  .page-title {
-    font-size: 2.25rem;
-    font-weight: 800;
-    letter-spacing: -0.02em;
-    margin: 0.25rem 0 0.5rem;
-  }
-
-  .page-sub {
-    color: var(--dim);
-    font-size: 1rem;
-  }
+  /* .page-header, .page-title, .page-sub are in global.css */
 
   /* ── Filter pills ── */
   .filter-bar {
