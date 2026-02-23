@@ -39,6 +39,7 @@ export const GET: APIRoute = async ({ request }) => {
 
     entries = (data ?? []).map((row: {
       rank: number;
+      github_login: string | null;
       agent_name: string;
       model: string | null;
       total_score: number;
@@ -47,6 +48,7 @@ export const GET: APIRoute = async ({ request }) => {
       avg_tokens: number | null;
     }) => ({
       rank: Number(row.rank),
+      github_login: row.github_login ?? null,
       agent_name: row.agent_name,
       model: row.model,
       total_score: Math.round(Number(row.total_score)),

@@ -9,7 +9,7 @@ import { supabase } from '../lib/supabase';
 const puzzleId = Astro.url.searchParams.get('puzzle');
 
 type GlobalEntry = {
-  rank: number;
+  rank?: number; // retained for row-top tinting, not shown as column
   github_login: string | null;
   agent_name: string;
   model: string | null;
@@ -18,19 +18,17 @@ type GlobalEntry = {
   avg_time_ms: number | null;
   avg_tokens: number | null;
   last_submitted_at: string;
-  // mapped aliases for LeaderboardTable
-  score: number;
+  // aliases for LeaderboardTable
   time_ms: number | null;
   tokens_used: number | null;
   submitted_at: string;
 };
 
 type PuzzleEntry = {
-  rank: number;
+  rank?: number; // retained for row-top tinting, not shown as column
   github_login: string | null;
   agent_name: string;
   model: string | null;
-  score: number;
   time_ms: number | null;
   tokens_used: number | null;
   submitted_at: string;
@@ -59,9 +57,13 @@ if (supabase) {
     });
 
     puzzleEntries = (data ?? []).map((s: any, i: number) => ({
-      ...s,
       rank: i + 1,
       github_login: s.github_login ?? null,
+      agent_name: s.agent_name,
+      model: s.model ?? null,
+      time_ms: s.time_ms ?? null,
+      tokens_used: s.tokens_used ?? null,
+      submitted_at: s.submitted_at,
     }));
   } else {
     // Global: use RPC now that it returns github_login
@@ -77,7 +79,6 @@ if (supabase) {
       avg_tokens: s.avg_tokens ?? null,
       last_submitted_at: s.last_submitted_at,
       // aliases for LeaderboardTable
-      score: s.total_score,
       time_ms: s.avg_time_ms ?? null,
       tokens_used: s.avg_tokens ?? null,
       submitted_at: s.last_submitted_at,
@@ -204,13 +205,6 @@ const CATEGORY_TABS = [
     const board = document.getElementById('category-leaderboard');
     const countEl = document.getElementById('entry-count');
 
-    function rankDisplay(rank: number): string {
-      if (rank === 1) return '🥇';
-      if (rank === 2) return '🥈';
-      if (rank === 3) return '🥉';
-      return `#${rank}`;
-    }
-
     function formatTime(ms: number | null | undefined): string {
       if (ms == null) return '—';
       if (ms < 1000) return `${ms}ms`;
@@ -224,16 +218,15 @@ const CATEGORY_TABS = [
     }
 
     interface LeaderEntry {
-      rank: number;
+      rank?: number;
       github_login?: string | null;
       agent_name: string;
       model?: string | null;
-      total_score?: number;
-      score?: number;
       avg_time_ms?: number | null;
       avg_tokens?: number | null;
       time_ms?: number | null;
       tokens_used?: number | null;
+      last_submitted_at?: string | null;
     }
 
     function renderTable(entries: LeaderEntry[]): string {
@@ -244,36 +237,31 @@ const CATEGORY_TABS = [
           <p>No agents have solved puzzles in this category.</p>
         </div>`;
       }
-      const rows = entries.map(e => {
-        const score = e.total_score ?? e.score ?? 0;
-        const isTop = e.rank <= 3;
+      const rows = entries.map((e, idx) => {
+        const isTop = (e.rank ?? idx + 1) <= 3;
         const userCell = e.github_login
           ? `<a href="/profile/${e.github_login}" class="user-link">@${e.github_login}</a>`
           : `<span class="dim-text">—</span>`;
+        const submitted = e.last_submitted_at
+          ? new Date(e.last_submitted_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+          : '—';
         return `<tr class="${isTop ? 'row-top' : ''}">
-          <td class="rank-cell">${rankDisplay(e.rank)}</td>
           <td class="user-cell">${userCell}</td>
           <td class="agent-cell"><span class="agent-name">${e.agent_name}</span></td>
           <td class="model-cell"><span class="model-tag">${e.model ?? '—'}</span></td>
-          <td class="score-cell">
-            <span class="score-pill">
-              <span class="score-value">${Math.round(score)}</span>
-              <span class="score-max">/pts</span>
-            </span>
-          </td>
           <td class="mono-cell">${formatTime(e.avg_time_ms ?? e.time_ms)}</td>
           <td class="mono-cell">${formatTokens(e.avg_tokens ?? e.tokens_used)}</td>
+          <td class="mono-cell">${submitted}</td>
         </tr>`;
       }).join('');
       return `<div class="table-wrap"><table>
         <thead><tr>
-          <th class="th-rank">Rank</th>
-          <th>User</th>
+          <th>Username</th>
           <th>Agent</th>
           <th>Model</th>
-          <th>Score</th>
           <th>Avg Speed</th>
           <th>Avg Tokens</th>
+          <th>Last Submitted</th>
         </tr></thead>
         <tbody>${rows}</tbody>
       </table></div>`;
