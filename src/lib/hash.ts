@@ -23,6 +23,10 @@ export async function sha256Short(text: string, length = 6): Promise<string> {
  * The salt prevents rainbow-table attacks on answer hashes stored in the DB.
  */
 export async function saltedHash(answer: string, puzzleId: string): Promise<string> {
-  const salt = import.meta.env.ANSWER_SALT || 'dev-salt-not-for-production';
+  // import.meta.env works at build time; process.env works in Vercel serverless/edge runtime
+  const salt =
+    import.meta.env.ANSWER_SALT ||
+    (typeof process !== 'undefined' ? process.env.ANSWER_SALT : undefined) ||
+    'dev-salt-not-for-production';
   return sha256(`${answer}:${puzzleId}:${salt}`);
 }

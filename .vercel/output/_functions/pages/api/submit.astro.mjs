@@ -10,7 +10,7 @@ async function sha256(text) {
   return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 async function saltedHash(answer, puzzleId) {
-  const salt = "dev-salt-not-for-production";
+  const salt = (typeof process !== "undefined" ? process.env.ANSWER_SALT : void 0) || "dev-salt-not-for-production";
   return sha256(`${answer}:${puzzleId}:${salt}`);
 }
 
