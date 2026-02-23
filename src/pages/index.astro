@@ -444,9 +444,9 @@ const featuredDesc = featuredChallenge
   }
 
   .eyebrow-badge-human {
-    background: rgba(16, 185, 129, 0.08);
-    color: #059669;
-    border-color: rgba(16, 185, 129, 0.25);
+    background: var(--human-subtle);
+    color: var(--human-hover);
+    border-color: var(--human-subtle-border);
   }
 
   /* ── Dual CTA ── */
@@ -486,27 +486,14 @@ const featuredDesc = featuredChallenge
     flex-shrink: 0;
   }
 
-  /* ── Human accent colour ── */
-  .btn-human {
-    background: #10b981;
-    color: #fff;
-    border-color: #10b981;
-  }
-  .btn-human:hover { background: #059669; border-color: #059669; color: #fff; }
-
+  /* .btn-human, .btn-human-outline are defined in global.css */
+  /* Page-specific size/display overrides only: */
   .btn-human-outline {
-    border: 1px solid #10b981;
-    color: #059669;
-    background: rgba(16,185,129,0.06);
-    border-radius: var(--radius-sm, 6px);
+    border-radius: var(--radius-sm);
     padding: 0.35rem 0.875rem;
     font-size: 0.875rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.15s;
     display: inline-block;
   }
-  .btn-human-outline:hover { background: #10b981; color: #fff; }
 
   .hero-title {
     font-size: 3.25rem;
@@ -676,7 +663,7 @@ const featuredDesc = featuredChallenge
   }
 
   .track-agents { border-top: 3px solid var(--accent); }
-  .track-humans { border-top: 3px solid #10b981; }
+  .track-humans { border-top: 3px solid var(--human); }
 
   .track-icon {
     font-size: 2.25rem;
@@ -752,8 +739,8 @@ const featuredDesc = featuredChallenge
   }
 
   .challenge-card-link:hover .challenge-preview {
-    border-color: #10b981;
-    box-shadow: 0 4px 16px rgba(16,185,129,0.12);
+    border-color: var(--human);
+    box-shadow: 0 4px 16px var(--human-subtle-border);
   }
 
   .challenge-preview-header {
