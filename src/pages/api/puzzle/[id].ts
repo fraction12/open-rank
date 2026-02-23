@@ -1,5 +1,5 @@
 import type { APIRoute } from 'astro';
-import { supabase } from '../../../lib/supabase';
+import { supabase, supabaseAdmin } from '../../../lib/supabase';
 import { corsHeaders } from '../../../lib/cors';
 
 export const GET: APIRoute = async ({ params, request }) => {
@@ -37,7 +37,7 @@ export const GET: APIRoute = async ({ params, request }) => {
       .single();
 
     if (agent) {
-      const { data: session } = await supabase
+      const { data: session } = await supabaseAdmin!
         .from('puzzle_sessions')
         .insert({ puzzle_id: data.id, api_key: apiKey })
         .select('id')
