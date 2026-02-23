@@ -425,8 +425,8 @@ const CATEGORY_TABS = [
       });
     });
 
-    // Auto-activate humans tab if URL hash is #humans
-    if (window.location.hash === '#humans') {
+    // Auto-activate humans tab if URL hash is #humans OR ?tab=humans query param is set
+    if (window.location.hash === '#humans' || new URLSearchParams(window.location.search).get('tab') === 'humans') {
       const humanTab = modeTabs.querySelector<HTMLButtonElement>('[data-mode="humans"]');
       humanTab?.click();
     }

@@ -1,5 +1,5 @@
 import type { APIRoute } from 'astro';
-import { supabase, getAgentByKey, getCurrentUser } from '../../lib/supabase';
+import { supabase, supabaseAdmin, getAgentByKey, getCurrentUser } from '../../lib/supabase';
 import { saltedHash } from '../../lib/hash';
 import { computeSpeedBonus, computeEfficiencyBonus, computeHumanEfficiencyBonus } from '../../lib/scoring';
 import { checkRateLimit } from '../../lib/rate-limit';
@@ -53,6 +53,9 @@ export const POST: APIRoute = async ({ request, cookies }) => {
   if (!puzzle_id || typeof puzzle_id !== 'string') return json({ error: 'puzzle_id is required' }, 400, cors);
   if (!answer   || typeof answer   !== 'string') return json({ error: 'answer is required' }, 400, cors);
 
+  // ── Guard: supabaseAdmin must be available for all writes ─
+  if (!supabaseAdmin) return json({ error: 'Database not configured' }, 503, cors);
+
   // ── Human challenge path ─────────────────────────────────
   // When is_human=true, we require GitHub auth instead of an api_key
   let humanUserId: string | null = null;
@@ -63,10 +66,23 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     if (!currentUser) return json({ error: 'Authentication required for human challenges. Sign in with GitHub.' }, 401, cors);
     humanUserId = currentUser.id;
 
-    if (!supabase) return json({ error: 'Database not configured' }, 503, cors);
+    // C1: Prevent duplicate correct human submissions (score farming)
+    // Check for an existing correct submission before counting attempts
+    const { data: existingCorrect } = await supabaseAdmin
+      .from('submissions')
+      .select('score, submitted_at')
+      .eq('user_id', humanUserId)
+      .eq('puzzle_id', puzzle_id)
+      .eq('is_human', true)
+      .eq('correct', true)
+      .maybeSingle();
+
+    if (existingCorrect) {
+      return json({ correct: true, score: existingCorrect.score, duplicate: true }, 200, cors);
+    }
 
     // Count previous submissions for this user+puzzle to determine attempt number
-    const { count: prevCount } = await supabase
+    const { count: prevCount } = await supabaseAdmin
       .from('submissions')
       .select('id', { count: 'exact', head: true })
       .eq('puzzle_id', puzzle_id)
@@ -127,10 +143,11 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     );
   }
 
-  if (!supabase) return json({ error: 'Database not configured' }, 503, cors);
-
   // ── Load puzzle (only fields needed for verification) ────
-  const { data: puzzle, error: pErr } = await supabase
+  // Puzzles SELECT is still open to anon — use cookie-based client (or supabase) here.
+  // Fall back to supabaseAdmin if anon client not available.
+  const puzzleClient = supabase ?? supabaseAdmin;
+  const { data: puzzle, error: pErr } = await puzzleClient
     .from('puzzles')
     .select('id, answer_hash')
     .eq('id', puzzle_id)
@@ -139,12 +156,13 @@ export const POST: APIRoute = async ({ request, cookies }) => {
   if (pErr || !puzzle) return json({ error: 'Puzzle not found' }, 404, cors);
 
   // ── Server-side timing: look up session ──────────────────
+  // puzzle_sessions is now locked to service role — must use supabaseAdmin
   let realTimeMs: number | null = null;
 
   if (session_id && typeof session_id === 'string') {
     if (is_human && humanUserId) {
       // Human session: scoped to user_id (not api_key)
-      const { data: session } = await supabase!
+      const { data: session } = await supabaseAdmin
         .from('puzzle_sessions')
         .update({ used: true })
         .eq('id', session_id)
@@ -160,7 +178,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     } else if (api_key && typeof api_key === 'string') {
       // Atomic UPDATE: only succeeds if session is unused, matches puzzle, and belongs to this api_key
       // Combines H2 (session scoping) + H3 (TOCTOU-safe atomic update)
-      const { data: session } = await supabase!
+      const { data: session } = await supabaseAdmin
         .from('puzzle_sessions')
         .update({ used: true })
         .eq('id', session_id)
@@ -182,11 +200,12 @@ export const POST: APIRoute = async ({ request, cookies }) => {
 
   // ── Get current bests for this puzzle (speed + efficiency) ──
   // Only compare against ranked (non-practice) submissions
+  // submissions is now locked — must use supabaseAdmin
   let bestTimeMs: number | null = null;
   let bestTokens: number | null = null;
 
   if (correct) {
-    const { data: bestSubs } = await supabase!
+    const { data: bestSubs } = await supabaseAdmin
       .from('submissions')
       .select('time_ms, tokens_used')
       .eq('puzzle_id', puzzle_id)
@@ -220,8 +239,8 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     : 0;
   const score = correctness + speed_bonus + efficiency_bonus;
 
-  // ── Insert submission ─────────────────────────────────────
-  const { data: inserted, error: insErr } = await supabase!
+  // ── Insert submission (via service role — RLS locked down) ────────────────
+  const { data: inserted, error: insErr } = await supabaseAdmin
     .from('submissions')
     .insert({
       puzzle_id,
@@ -253,7 +272,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
   // ── Calculate rank (only among ranked submissions) ────────
   let rank: number = 1;
   if (!isPractice) {
-    const { count } = await supabase!
+    const { count } = await supabaseAdmin
       .from('submissions')
       .select('id', { count: 'exact', head: true })
       .eq('puzzle_id', puzzle_id)

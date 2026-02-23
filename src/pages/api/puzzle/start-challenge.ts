@@ -1,5 +1,5 @@
 import type { APIRoute } from 'astro';
-import { supabase, getCurrentUser } from '../../../lib/supabase';
+import { supabase, supabaseAdmin, getCurrentUser } from '../../../lib/supabase';
 import { corsHeaders } from '../../../lib/cors';
 import { json } from '../../../lib/response';
 
@@ -20,6 +20,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
   const cors = corsHeaders(request);
 
   // ── Auth: require GitHub session ─────────────────────────
+  // getCurrentUser uses the cookie-based SSR client — keep as-is
   const currentUser = await getCurrentUser(cookies);
   if (!currentUser) {
     return json({ error: 'Authentication required. Sign in with GitHub.' }, 401, cors);
@@ -38,11 +39,14 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     return json({ error: 'puzzle_id is required' }, 400, cors);
   }
 
-  if (!supabase) return json({ error: 'Database not configured' }, 503, cors);
+  // ── Guard: supabaseAdmin required for puzzle_sessions (RLS locked) ────────
+  if (!supabaseAdmin) return json({ error: 'Database not configured' }, 503, cors);
 
   // ── Verify puzzle exists and is released ──────────────────
+  // Puzzles SELECT is still open to anon — use anon client (or admin as fallback)
+  const puzzleClient = supabase ?? supabaseAdmin;
   const today = new Date().toISOString().split('T')[0];
-  const { data: puzzle, error: puzzleErr } = await supabase
+  const { data: puzzle, error: puzzleErr } = await puzzleClient
     .from('puzzles')
     .select('id, release_date')
     .eq('id', puzzle_id)
@@ -53,9 +57,9 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     return json({ error: 'Puzzle not found or not yet released' }, 404, cors);
   }
 
-  // ── Check for existing unused session ─────────────────────
+  // ── Check for existing unused session (via supabaseAdmin — RLS locked) ────
   // Prevents farming: if a session exists for this user+puzzle, reuse it
-  const { data: existingSession } = await supabase
+  const { data: existingSession } = await supabaseAdmin
     .from('puzzle_sessions')
     .select('id')
     .eq('puzzle_id', puzzle_id)
@@ -69,8 +73,8 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     return json({ session_id: existingSession.id }, 200, cors);
   }
 
-  // ── Create new session ────────────────────────────────────
-  const { data: newSession, error: insertErr } = await supabase
+  // ── Create new session (via supabaseAdmin — RLS locked) ───────────────────
+  const { data: newSession, error: insertErr } = await supabaseAdmin
     .from('puzzle_sessions')
     .insert({
       puzzle_id,
