@@ -1,0 +1,207 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { supabase } from '../../lib/supabase';
+
+const { username } = Astro.params;
+if (!username) return Astro.redirect('/');
+
+if (!supabase) {
+  return new Response('Database not configured', { status: 503 });
+}
+
+// ── Fetch user ────────────────────────────────────────────────────────────────
+const { data: profileUser } = await supabase
+  .from('users')
+  .select('id, github_login, avatar_url, created_at')
+  .eq('github_login', username)
+  .single();
+
+if (!profileUser) {
+  return new Response('User not found', { status: 404 });
+}
+
+// ── Fetch agents with stats ───────────────────────────────────────────────────
+const { data: agents } = await supabase
+  .from('agents')
+  .select('id, name, created_at')
+  .eq('user_id', profileUser.id)
+  .order('created_at', { ascending: false });
+
+// For each agent, get stats (puzzles solved, total score, skills used)
+type AgentStats = {
+  id: string;
+  name: string;
+  created_at: string;
+  puzzles_solved: number;
+  total_score: number;
+  skills: string[];
+};
+
+const agentStats: AgentStats[] = [];
+for (const agent of (agents ?? [])) {
+  const { data: subs } = await supabase
+    .from('submissions')
+    .select('puzzle_id, score, skill_used')
+    .eq('agent_id', agent.id)
+    .eq('correct', true)
+    .eq('is_practice', false);
+
+  const uniquePuzzles = new Set((subs ?? []).map(s => s.puzzle_id));
+  const totalScore = (subs ?? []).reduce((sum, s) => sum + (s.score ?? 0), 0);
+  const skills = [...new Set((subs ?? []).map(s => s.skill_used).filter(Boolean) as string[])];
+
+  agentStats.push({
+    id: agent.id,
+    name: agent.name,
+    created_at: agent.created_at,
+    puzzles_solved: uniquePuzzles.size,
+    total_score: Math.round(totalScore),
+    skills,
+  });
+}
+
+// ── Fetch recent submissions (non-practice) ───────────────────────────────────
+const { data: recentSubs } = await supabase
+  .from('submissions')
+  .select('id, puzzle_id, agent_name, model, score, correct, time_ms, tokens_used, submitted_at, skill_used, puzzles(title)')
+  .eq('agent_id', agentStats.length > 0 ? agentStats[0].id : '00000000-0000-0000-0000-000000000000')
+  .eq('is_practice', false)
+  .order('submitted_at', { ascending: false })
+  .limit(10);
+
+// Actually, let's get subs for ALL agents of this user
+const agentIds = agentStats.map(a => a.id);
+let allRecentSubs: any[] = [];
+if (agentIds.length > 0) {
+  const { data } = await supabase
+    .from('submissions')
+    .select('id, agent_name, model, score, correct, time_ms, submitted_at, skill_used, puzzles(id, title)')
+    .in('agent_id', agentIds)
+    .eq('is_practice', false)
+    .order('submitted_at', { ascending: false })
+    .limit(10);
+  allRecentSubs = data ?? [];
+}
+---
+
+<Layout title={`@${profileUser.github_login} — Profile`}>
+  <div class="container" style="padding-top: 2.5rem; padding-bottom: 4rem; max-width: 800px;">
+    
+    <!-- ── Profile header ──────────────────────────────────────────────────── -->
+    <div class="card" style="display: flex; align-items: center; gap: 1.25rem; margin-bottom: 2rem;">
+      {profileUser.avatar_url && (
+        <img
+          src={profileUser.avatar_url}
+          alt={profileUser.github_login}
+          width="72"
+          height="72"
+          style="border-radius: 50%; flex-shrink: 0; border: 2px solid var(--border);"
+        />
+      )}
+      <div>
+        <h1 style="font-size: 1.5rem; font-weight: 700; color: var(--text);">
+          @{profileUser.github_login}
+        </h1>
+        <p style="color: var(--dim); font-size: 0.875rem; margin-top: 0.25rem;">
+          Member since {new Date(profileUser.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+        </p>
+      </div>
+    </div>
+
+    <!-- ── Agents ─────────────────────────────────────────────────────────── -->
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <h2 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 1.25rem; color: var(--text);">
+        Agents ({agentStats.length})
+      </h2>
+
+      {agentStats.length === 0 ? (
+        <p style="color: var(--dim); font-size: 0.9375rem;">No agents yet.</p>
+      ) : (
+        <div style="display: grid; gap: 0.75rem;">
+          {agentStats.map(agent => (
+            <div style="border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 1rem 1.25rem; background: var(--surface);">
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;">
+                <div>
+                  <span style="font-weight: 600; color: var(--text); font-size: 1rem;">{agent.name}</span>
+                  {agent.skills.length > 0 && (
+                    <div style="margin-top: 0.35rem; display: flex; flex-wrap: wrap; gap: 0.35rem;">
+                      {agent.skills.map(skill => (
+                        <span style="background: var(--accent-subtle); border: 1px solid var(--accent-subtle-border); color: var(--accent); font-size: 0.75rem; padding: 0.15rem 0.5rem; border-radius: 999px;">
+                          {skill}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div style="display: flex; gap: 1.5rem; text-align: right;">
+                  <div>
+                    <div style="font-size: 1.25rem; font-weight: 700; color: var(--text);">{agent.puzzles_solved}</div>
+                    <div style="font-size: 0.75rem; color: var(--dim);">Puzzles Solved</div>
+                  </div>
+                  <div>
+                    <div style="font-size: 1.25rem; font-weight: 700; color: var(--accent);">{agent.total_score}</div>
+                    <div style="font-size: 0.75rem; color: var(--dim);">Total Score</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+
+    <!-- ── Recent submissions ─────────────────────────────────────────────── -->
+    {allRecentSubs.length > 0 && (
+      <div class="card">
+        <h2 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 1.25rem; color: var(--text);">
+          Recent Submissions
+        </h2>
+        <div style="overflow-x: auto;">
+          <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+            <thead>
+              <tr style="border-bottom: 1px solid var(--border);">
+                <th style="text-align: left; padding: 0.5rem 0.75rem; color: var(--dim); font-weight: 500; font-size: 0.8125rem; text-transform: uppercase; letter-spacing: 0.04em;">Puzzle</th>
+                <th style="text-align: left; padding: 0.5rem 0.75rem; color: var(--dim); font-weight: 500; font-size: 0.8125rem; text-transform: uppercase; letter-spacing: 0.04em;">Agent</th>
+                <th style="text-align: center; padding: 0.5rem 0.75rem; color: var(--dim); font-weight: 500; font-size: 0.8125rem; text-transform: uppercase; letter-spacing: 0.04em;">Result</th>
+                <th style="text-align: right; padding: 0.5rem 0.75rem; color: var(--dim); font-weight: 500; font-size: 0.8125rem; text-transform: uppercase; letter-spacing: 0.04em;">Score</th>
+                <th style="text-align: right; padding: 0.5rem 0.75rem; color: var(--dim); font-weight: 500; font-size: 0.8125rem; text-transform: uppercase; letter-spacing: 0.04em;">Time</th>
+              </tr>
+            </thead>
+            <tbody>
+              {allRecentSubs.map((sub: any) => (
+                <tr style="border-bottom: 1px solid var(--border);">
+                  <td style="padding: 0.75rem; color: var(--text);">
+                    {sub.puzzles?.title ?? sub.puzzles?.id ?? '—'}
+                  </td>
+                  <td style="padding: 0.75rem; color: var(--dim); font-size: 0.875rem;">{sub.agent_name}</td>
+                  <td style="padding: 0.75rem; text-align: center;">
+                    <span style={`font-size: 0.8125rem; font-weight: 600; padding: 0.15rem 0.5rem; border-radius: 999px; ${sub.correct ? 'background: var(--success-subtle); color: var(--success);' : 'background: var(--error-subtle); color: var(--error);'}`}>
+                      {sub.correct ? '✓ Correct' : '✗ Wrong'}
+                    </span>
+                  </td>
+                  <td style="padding: 0.75rem; text-align: right; font-weight: 600; color: var(--accent);">
+                    {Math.round(sub.score ?? 0)}
+                  </td>
+                  <td style="padding: 0.75rem; text-align: right; color: var(--dim); font-size: 0.875rem;">
+                    {sub.time_ms ? `${(sub.time_ms / 1000).toFixed(1)}s` : '—'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    )}
+
+  </div>
+</Layout>
+
+<style>
+  .card {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    box-shadow: var(--shadow-sm);
+  }
+</style>

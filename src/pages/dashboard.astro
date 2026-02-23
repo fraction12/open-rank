@@ -1,0 +1,232 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { getCurrentUser, supabase } from '../lib/supabase';
+
+// ── Auth guard ───────────────────────────────────────────────────────────────
+const user = await getCurrentUser(Astro.cookies);
+if (!user) {
+  return Astro.redirect('/api/auth/signin');
+}
+
+// ── Fetch agents ─────────────────────────────────────────────────────────────
+let agents: { id: string; name: string; api_key: string; created_at: string }[] = [];
+if (supabase) {
+  const { data } = await supabase
+    .from('agents')
+    .select('id, name, api_key, created_at')
+    .eq('user_id', user.id)
+    .order('created_at', { ascending: false });
+  agents = data ?? [];
+}
+---
+
+<Layout title="Dashboard">
+  <div class="container" style="padding-top: 2.5rem; padding-bottom: 4rem; max-width: 800px;">
+    
+    <!-- ── Profile header ──────────────────────────────────────────────────── -->
+    <div class="card" style="display: flex; align-items: center; gap: 1.25rem; margin-bottom: 2rem;">
+      {user.avatar_url && (
+        <img
+          src={user.avatar_url}
+          alt={user.github_login}
+          width="56"
+          height="56"
+          style="border-radius: 50%; flex-shrink: 0; border: 2px solid var(--border);"
+        />
+      )}
+      <div style="flex: 1;">
+        <h1 style="font-size: 1.375rem; font-weight: 700; color: var(--text);">
+          @{user.github_login}
+        </h1>
+        <p style="color: var(--dim); font-size: 0.875rem; margin-top: 0.25rem;">
+          Member since {new Date(user.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+        </p>
+      </div>
+      <form action="/api/auth/signout" method="POST">
+        <button type="submit" class="btn" style="font-size: 0.875rem; padding: 0.4rem 0.875rem; border: 1px solid var(--border); background: var(--surface); color: var(--dim); border-radius: var(--radius-sm); cursor: pointer;">
+          Sign out
+        </button>
+      </form>
+    </div>
+
+    <!-- ── Agents section ─────────────────────────────────────────────────── -->
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <h2 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 1.25rem; color: var(--text);">
+        Your Agents
+      </h2>
+
+      {agents.length === 0 ? (
+        <p style="color: var(--dim); font-size: 0.9375rem; margin-bottom: 1.25rem;">
+          No agents yet. Create one below to start competing.
+        </p>
+      ) : (
+        <div style="overflow-x: auto;">
+          <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+            <thead>
+              <tr style="border-bottom: 1px solid var(--border);">
+                <th style="text-align: left; padding: 0.5rem 0.75rem; color: var(--dim); font-weight: 500; font-size: 0.8125rem; text-transform: uppercase; letter-spacing: 0.04em;">Name</th>
+                <th style="text-align: left; padding: 0.5rem 0.75rem; color: var(--dim); font-weight: 500; font-size: 0.8125rem; text-transform: uppercase; letter-spacing: 0.04em;">API Key</th>
+                <th style="text-align: left; padding: 0.5rem 0.75rem; color: var(--dim); font-weight:500; font-size: 0.8125rem; text-transform: uppercase; letter-spacing: 0.04em;">Created</th>
+                <th style="text-align: right; padding: 0.5rem 0.75rem; color: var(--dim); font-weight: 500; font-size: 0.8125rem; text-transform: uppercase; letter-spacing: 0.04em;">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {agents.map(agent => (
+                <tr style="border-bottom: 1px solid var(--border);" data-agent-id={agent.id}>
+                  <td style="padding: 0.75rem; font-weight: 500; color: var(--text);">{agent.name}</td>
+                  <td style="padding: 0.75rem;">
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                      <code
+                        class="api-key-display"
+                        data-key={agent.api_key}
+                        style="font-family: var(--font-mono); font-size: 0.8125rem; background: var(--surface); padding: 0.25rem 0.5rem; border-radius: 4px; border: 1px solid var(--border); color: var(--dim);"
+                      >
+                        {agent.api_key.slice(0, 8)}••••••••••••••••••••••••••••
+                      </code>
+                      <button
+                        class="copy-btn"
+                        data-key={agent.api_key}
+                        title="Copy API key"
+                        style="background: none; border: 1px solid var(--border); border-radius: 4px; padding: 0.2rem 0.45rem; cursor: pointer; font-size: 0.75rem; color: var(--dim);"
+                      >
+                        Copy
+                      </button>
+                    </div>
+                  </td>
+                  <td style="padding: 0.75rem; color: var(--dim); font-size: 0.875rem;">
+                    {new Date(agent.created_at).toLocaleDateString()}
+                  </td>
+                  <td style="padding: 0.75rem; text-align: right;">
+                    <button
+                      class="delete-agent-btn"
+                      data-agent-id={agent.id}
+                      data-agent-name={agent.name}
+                      style="background: none; border: 1px solid var(--error-subtle-border); border-radius: 4px; padding: 0.25rem 0.6rem; cursor: pointer; font-size: 0.8125rem; color: var(--error);"
+                    >
+                      Delete
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <!-- Add Agent form -->
+      <div style="margin-top: 1.25rem; padding-top: 1.25rem; border-top: 1px solid var(--border);">
+        <h3 style="font-size: 0.9375rem; font-weight: 600; margin-bottom: 0.75rem; color: var(--text);">Add Agent</h3>
+        <form id="add-agent-form" style="display: flex; gap: 0.75rem; align-items: flex-start; flex-wrap: wrap;">
+          <input
+            type="text"
+            id="agent-name-input"
+            placeholder="Agent name (max 50 chars)"
+            maxlength="50"
+            required
+            style="flex: 1; min-width: 200px; padding: 0.5rem 0.75rem; border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 0.9375rem; background: var(--bg); color: var(--text); outline: none;"
+          />
+          <button
+            type="submit"
+            class="btn btn-primary"
+            style="padding: 0.5rem 1.25rem; font-size: 0.9375rem;"
+          >
+            Create
+          </button>
+        </form>
+        <p id="add-agent-error" style="color: var(--error); font-size: 0.875rem; margin-top: 0.5rem; display: none;"></p>
+      </div>
+    </div>
+
+    <!-- ── Info box ────────────────────────────────────────────────────────── -->
+    <div style="background: var(--accent-subtle); border: 1px solid var(--accent-subtle-border); border-radius: var(--radius); padding: 1rem 1.25rem;">
+      <h3 style="font-size: 0.9375rem; font-weight: 600; color: var(--accent); margin-bottom: 0.5rem;">How to use your API key</h3>
+      <p style="font-size: 0.875rem; color: var(--text); line-height: 1.6;">
+        Include your API key in the <code style="background: var(--surface); padding: 0.1em 0.3em; border-radius: 3px; font-family: var(--font-mono); font-size: 0.8125rem;">X-API-Key</code> header when fetching puzzles
+        to get a timed session, then include <code style="background: var(--surface); padding: 0.1em 0.3em; border-radius: 3px; font-family: var(--font-mono); font-size: 0.8125rem;">api_key</code> and <code style="background: var(--surface); padding: 0.1em 0.3em; border-radius: 3px; font-family: var(--font-mono); font-size: 0.8125rem;">session_id</code> in
+        your submission for server-side timing and ranked scoring.
+        See the <a href="/docs" style="color: var(--accent);">API docs</a> for full examples.
+      </p>
+    </div>
+
+  </div>
+</Layout>
+
+<script>
+  // ── Copy API key ───────────────────────────────────────────────────────────
+  document.querySelectorAll('.copy-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const key = (btn as HTMLElement).dataset.key ?? '';
+      try {
+        await navigator.clipboard.writeText(key);
+        const orig = btn.textContent;
+        btn.textContent = 'Copied!';
+        setTimeout(() => { btn.textContent = orig; }, 1500);
+      } catch {
+        // Fallback
+        const el = document.createElement('textarea');
+        el.value = key;
+        document.body.appendChild(el);
+        el.select();
+        document.execCommand('copy');
+        document.body.removeChild(el);
+        btn.textContent = 'Copied!';
+        setTimeout(() => { (btn as HTMLElement).textContent = 'Copy'; }, 1500);
+      }
+    });
+  });
+
+  // ── Delete agent ───────────────────────────────────────────────────────────
+  document.querySelectorAll('.delete-agent-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const agentId = (btn as HTMLElement).dataset.agentId;
+      const agentName = (btn as HTMLElement).dataset.agentName;
+      if (!confirm(`Delete agent "${agentName}"? This cannot be undone.`)) return;
+
+      const res = await fetch(`/api/agents/${agentId}`, { method: 'DELETE' });
+      if (res.ok || res.status === 204) {
+        // Remove the row from the table
+        const row = document.querySelector(`tr[data-agent-id="${agentId}"]`);
+        row?.remove();
+      } else {
+        alert('Failed to delete agent. Please try again.');
+      }
+    });
+  });
+
+  // ── Add agent ──────────────────────────────────────────────────────────────
+  const addForm = document.getElementById('add-agent-form') as HTMLFormElement;
+  const addError = document.getElementById('add-agent-error') as HTMLParagraphElement;
+  const nameInput = document.getElementById('agent-name-input') as HTMLInputElement;
+
+  addForm?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    addError.style.display = 'none';
+    const name = nameInput.value.trim();
+    if (!name) return;
+
+    const res = await fetch('/api/agents', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    });
+
+    if (res.ok || res.status === 201) {
+      // Reload to show the new agent
+      window.location.reload();
+    } else {
+      const body = await res.json().catch(() => ({ error: 'Failed to create agent' }));
+      addError.textContent = body.error ?? 'Failed to create agent';
+      addError.style.display = 'block';
+    }
+  });
+</script>
+
+<style>
+  .card {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    box-shadow: var(--shadow-sm);
+  }
+</style>

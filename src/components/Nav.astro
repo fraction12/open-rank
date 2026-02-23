@@ -1,4 +1,12 @@
 ---
+import type { User } from '../lib/supabase';
+
+interface Props {
+  currentUser?: User | null;
+}
+
+const { currentUser = null } = Astro.props;
+
 const navLinks = [
   { href: '/', label: 'Home' },
   { href: '/leaderboard', label: 'Leaderboard' },
@@ -34,9 +42,26 @@ const currentPath = Astro.url.pathname;
       ))}
     </ul>
 
-    <a href="/docs#api" class="btn btn-primary nav-cta">
-      Use API →
-    </a>
+    {currentUser ? (
+      <div class="nav-auth">
+        <a href="/dashboard" class="nav-user-link" title="Dashboard">
+          {currentUser.avatar_url && (
+            <img
+              src={currentUser.avatar_url}
+              alt={currentUser.github_login}
+              width="30"
+              height="30"
+              class="nav-avatar"
+            />
+          )}
+          <span class="nav-username">@{currentUser.github_login}</span>
+        </a>
+      </div>
+    ) : (
+      <a href="/api/auth/signin" class="btn btn-primary nav-cta">
+        Sign in with GitHub
+      </a>
+    )}
   </div>
 </nav>
 
@@ -123,6 +148,38 @@ const currentPath = Astro.url.pathname;
     padding: 0.45rem 1rem;
   }
 
+  /* ── Auth area ── */
+  .nav-auth {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+  }
+
+  .nav-user-link {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-decoration: none;
+    padding: 0.3rem 0.6rem;
+    border-radius: 8px;
+    transition: background 0.15s;
+  }
+
+  .nav-user-link:hover {
+    background: var(--surface);
+  }
+
+  .nav-avatar {
+    border-radius: 50%;
+    border: 1.5px solid var(--border);
+  }
+
+  .nav-username {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text);
+  }
+
   /* ── Mobile hamburger ── */
   .nav-toggle {
     display: none;
@@ -151,6 +208,7 @@ const currentPath = Astro.url.pathname;
   @media (max-width: 768px) {
     .nav-toggle { display: flex; }
     .nav-cta    { display: none; }
+    .nav-auth   { display: none; }
 
     .nav-links {
       display: none;

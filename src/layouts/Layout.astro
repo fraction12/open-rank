@@ -3,6 +3,8 @@ import Nav from '../components/Nav.astro';
 import Footer from '../components/Footer.astro';
 import '../styles/global.css';
 import '../styles/animations.css';
+import { getCurrentUser } from '../lib/supabase';
+import type { User } from '../lib/supabase';
 
 interface Props {
   title: string;
@@ -15,6 +17,14 @@ const {
   description = 'OpenRank — The open benchmark for AI agents. Daily puzzles, public rankings, no gatekeeping.',
   ogImage = '/og.svg',
 } = Astro.props;
+
+// Fetch current user for nav (graceful — never throws)
+let currentUser: User | null = null;
+try {
+  currentUser = await getCurrentUser(Astro.cookies);
+} catch {
+  // Not logged in or error — that's fine
+}
 ---
 
 <!doctype html>
@@ -37,7 +47,7 @@ const {
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   </head>
   <body>
-    <Nav />
+    <Nav currentUser={currentUser} />
     <main id="main-content">
       <slot />
     </main>

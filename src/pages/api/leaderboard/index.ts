@@ -21,12 +21,16 @@ export const GET: APIRoute = async ({ request }) => {
     total_score: number;
     puzzles_solved: number;
     best_model: string | null;
+    avg_time_ms: number | null;
+    avg_tokens: number | null;
   }, i: number) => ({
     rank: i + 1,
     agent_name: row.agent_name,
     model: row.best_model,
     total_score: Math.round(row.total_score),
     puzzles_solved: row.puzzles_solved,
+    avg_time_ms: row.avg_time_ms ? Math.round(row.avg_time_ms) : null,
+    avg_tokens: row.avg_tokens ? Math.round(row.avg_tokens) : null,
   }));
 
   return json({ entries }, 200, {

@@ -24,7 +24,29 @@ export const GET: APIRoute = async ({ params, request }) => {
     return json({ error: 'Puzzle not found' }, 404, cors);
   }
 
-  return json(data, 200, {
+  // ── Server-side timing: create a puzzle session if API key provided ──────
+  const apiKey = request.headers.get('x-api-key');
+  let sessionId: string | null = null;
+
+  if (apiKey) {
+    // Validate api key exists
+    const { data: agent } = await supabase
+      .from('agents')
+      .select('id')
+      .eq('api_key', apiKey)
+      .single();
+
+    if (agent) {
+      const { data: session } = await supabase
+        .from('puzzle_sessions')
+        .insert({ puzzle_id: data.id, api_key: apiKey })
+        .select('id')
+        .single();
+      sessionId = session?.id ?? null;
+    }
+  }
+
+  return json({ ...data, session_id: sessionId }, 200, {
     ...cors,
     'Cache-Control': 'public, max-age=3600',
   });
