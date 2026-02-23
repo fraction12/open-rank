@@ -51,7 +51,7 @@ export const POST: APIRoute = async ({ request }) => {
     'unknown';
 
   const rlKey = `${ip}:${puzzle_id}`;
-  const rl = checkRateLimit(rlKey, 10, 60 * 60 * 1000); // 10 per hour per puzzle per IP
+  const rl = await checkRateLimit(rlKey, 10, 60 * 60 * 1000); // 10 per hour per puzzle per IP
   if (!rl.allowed) {
     return json(
       { error: 'Rate limit exceeded. Try again later.', retry_after: rl.retryAfter },

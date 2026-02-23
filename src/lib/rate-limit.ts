@@ -1,22 +1,52 @@
-const store = new Map<string, { count: number; resetAt: number }>();
+import { supabase } from './supabase';
 
-export function checkRateLimit(
+/**
+ * Persistent rate limiter backed by Supabase.
+ * Falls back to in-memory if Supabase is unavailable.
+ */
+const fallback = new Map<string, { count: number; resetAt: number }>();
+
+export async function checkRateLimit(
   key: string,
   maxRequests: number,
   windowMs: number,
-): { allowed: boolean; retryAfter?: number } {
-  const now = Date.now();
-  const entry = store.get(key);
+): Promise<{ allowed: boolean; retryAfter?: number }> {
+  if (!supabase) return checkFallback(key, maxRequests, windowMs);
 
+  try {
+    // Upsert: if key exists and not expired, increment; else reset
+    const { data, error } = await supabase.rpc('check_rate_limit', {
+      p_key: key,
+      p_max: maxRequests,
+      p_window_ms: windowMs,
+    });
+
+    if (error) {
+      console.warn('Rate limit DB error, using fallback:', error.message);
+      return checkFallback(key, maxRequests, windowMs);
+    }
+
+    // data = { allowed: boolean, count: number, reset_at: string }
+    if (!data.allowed) {
+      const retryAfter = Math.ceil((new Date(data.reset_at).getTime() - Date.now()) / 1000);
+      return { allowed: false, retryAfter: Math.max(1, retryAfter) };
+    }
+    return { allowed: true };
+  } catch {
+    return checkFallback(key, maxRequests, windowMs);
+  }
+}
+
+function checkFallback(key: string, maxRequests: number, windowMs: number) {
+  const now = Date.now();
+  const entry = fallback.get(key);
   if (!entry || now > entry.resetAt) {
-    store.set(key, { count: 1, resetAt: now + windowMs });
+    fallback.set(key, { count: 1, resetAt: now + windowMs });
     return { allowed: true };
   }
-
   if (entry.count >= maxRequests) {
     return { allowed: false, retryAfter: Math.ceil((entry.resetAt - now) / 1000) };
   }
-
   entry.count++;
   return { allowed: true };
 }
