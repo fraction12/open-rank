@@ -18,6 +18,18 @@ function createSupabaseClient() {
 
 export const supabase = createSupabaseClient();
 
+// ── Service role client (bypasses RLS — use only in server-side routes with prior auth checks) ──
+const serviceRoleKey = (typeof process !== 'undefined' ? process.env['SUPABASE_SERVICE_ROLE_KEY'] : undefined) || import.meta.env.SUPABASE_SERVICE_ROLE_KEY as string | undefined;
+
+function createAdminClient() {
+  if (!supabaseUrl || !serviceRoleKey) return null;
+  return createClient(supabaseUrl, serviceRoleKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+}
+
+export const supabaseAdmin = createAdminClient();
+
 // ── Server client with cookie support (for auth) ────────────────────────────
 export function createSupabaseServerClient(cookies: any) {
   const url = (typeof process !== 'undefined' ? process.env[urlKey] : undefined) || import.meta.env.SUPABASE_URL as string;
