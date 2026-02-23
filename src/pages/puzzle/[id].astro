@@ -3,7 +3,7 @@ export const prerender = false;
 
 import Layout from '../../layouts/Layout.astro';
 import LeaderboardTable from '../../components/LeaderboardTable.astro';
-import { supabase } from '../../lib/supabase';
+import { getCurrentUser, supabase } from '../../lib/supabase';
 import type { Puzzle, Submission } from '../../lib/supabase';
 
 const { id } = Astro.params;
@@ -14,7 +14,7 @@ let leaderboard: Array<Submission & { rank: number }> = [];
 if (supabase && id) {
   const { data: p } = await supabase
     .from('puzzles')
-    .select('id, title, description, difficulty, input_data, release_date, created_at')
+    .select('id, title, description, difficulty, category, input_data, release_date, created_at')
     .eq('id', id)
     .single();
   puzzle = p ?? null;
@@ -54,7 +54,25 @@ if (puzzle.release_date > todayStr) {
   return new Response(null, { status: 404, statusText: 'Not Found' });
 }
 
+// ── Auth: get current user + their agents ────────────────────────────────────
+const currentUser = await getCurrentUser(Astro.cookies);
+let userAgents: { id: string; name: string; api_key: string }[] = [];
+if (currentUser && supabase) {
+  const { data } = await supabase
+    .from('agents')
+    .select('id, name, api_key')
+    .eq('user_id', currentUser.id)
+    .order('created_at');
+  userAgents = data ?? [];
+}
+
+const isRanked = currentUser !== null && userAgents.length > 0;
+const isPracticeWithAccount = currentUser !== null && userAgents.length === 0;
+const isGuest = currentUser === null;
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
 const isToday = puzzle.release_date === new Date().toISOString().split('T')[0];
+
 const difficultyColor = {
   easy: 'var(--diff-easy)',
   medium: 'var(--diff-medium)',
@@ -62,7 +80,82 @@ const difficultyColor = {
   insane: 'var(--diff-insane)',
 }[puzzle.difficulty];
 
-const curlExample = `curl -X POST https://open-rank.com/api/submit \\
+const categoryLabel: Record<string, string> = {
+  data_analysis: '📊 Data Analysis',
+  coding: '💻 Coding',
+  cipher_reasoning: '🔐 Cipher / Reasoning',
+  multi_step: '🧩 Multi-step',
+  code_review: '📁 Code Review',
+  long_context: '🧠 Long Context',
+  web_research: '🔍 Web Research',
+};
+
+// ── Markdown renderer (simple, no deps) ────────────────────────────────────
+function renderMarkdown(text: string): string {
+  // 1. Escape HTML entities first (except we'll re-inject safe ones)
+  const escape = (s: string) =>
+    s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+  const lines = text.split('\n');
+  const out: string[] = [];
+  let i = 0;
+
+  while (i < lines.length) {
+    // Triple-backtick code blocks
+    if (lines[i].trim().startsWith('```')) {
+      const lang = lines[i].trim().slice(3).trim();
+      i++;
+      const codeLines: string[] = [];
+      while (i < lines.length && !lines[i].trim().startsWith('```')) {
+        codeLines.push(escape(lines[i]));
+        i++;
+      }
+      i++; // consume closing ```
+      out.push(`<pre><code class="language-${lang}">${codeLines.join('\n')}</code></pre>`);
+      continue;
+    }
+
+    const line = lines[i];
+    if (!line.trim()) {
+      out.push('<br />');
+      i++;
+      continue;
+    }
+
+    // Inline rendering: bold then code
+    const rendered = escape(line)
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/`([^`]+)`/g, '<code>$1</code>');
+    out.push(`<p>${rendered}</p>`);
+    i++;
+  }
+
+  return out.join('');
+}
+
+// ── Curl examples ─────────────────────────────────────────────────────────
+const curlRanked = `# 1. Fetch puzzle — X-API-Key starts the server timer
+RESPONSE=$(curl -s https://open-rank.com/api/puzzle/today \\
+  -H "X-API-Key: YOUR_API_KEY")
+PUZZLE_ID=$(echo $RESPONSE | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['id'])")
+SESSION_ID=$(echo $RESPONSE | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['session_id'])")
+
+# 2. Solve it (your agent logic here)
+ANSWER="your_computed_answer"
+
+# 3. Submit — server calculates real elapsed time
+curl -X POST https://open-rank.com/api/submit \\
+  -H "Content-Type: application/json" \\
+  -d "{
+    \\"puzzle_id\\": \\"$PUZZLE_ID\\",
+    \\"answer\\": \\"$ANSWER\\",
+    \\"api_key\\": \\"YOUR_API_KEY\\",
+    \\"session_id\\": \\"$SESSION_ID\\",
+    \\"model\\": \\"gpt-4o\\",
+    \\"tokens_used\\": 512
+  }"`;
+
+const curlPractice = `curl -X POST https://open-rank.com/api/submit \\
   -H "Content-Type: application/json" \\
   -d '{
     "puzzle_id": "${puzzle.id}",
@@ -92,6 +185,9 @@ const curlExample = `curl -X POST https://open-rank.com/api/submit \\
           <header class="puzzle-header">
             <div class="puzzle-meta">
               <span class={`badge badge-${puzzle.difficulty}`}>{puzzle.difficulty}</span>
+              {puzzle.category && categoryLabel[puzzle.category] && (
+                <span class="badge-category">{categoryLabel[puzzle.category]}</span>
+              )}
               <time class="puzzle-date" datetime={puzzle.release_date}>
                 {new Date(puzzle.release_date).toLocaleDateString('en-US', {
                   weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
@@ -105,11 +201,7 @@ const curlExample = `curl -X POST https://open-rank.com/api/submit \\
           <!-- Description -->
           <section class="puzzle-description card">
             <h2 class="section-heading">Description</h2>
-            <div class="prose">
-              {puzzle.description.split('\n').map(line =>
-                line.trim() ? <p>{line}</p> : <br />
-              )}
-            </div>
+            <div class="prose" set:html={renderMarkdown(puzzle.description)} />
           </section>
 
           <!-- Input Data -->
@@ -141,36 +233,82 @@ const curlExample = `curl -X POST https://open-rank.com/api/submit \\
           <section class="puzzle-submit card" id="submit">
             <h2 class="section-heading">Submit Your Answer</h2>
 
+            <!-- Auth-state callouts -->
+            {isRanked && (
+              <div class="callout callout-green">
+                🏆 Ranked mode — your score will appear on the leaderboard.
+              </div>
+            )}
+            {isPracticeWithAccount && (
+              <div class="callout callout-yellow">
+                You're in practice mode. <a href="/dashboard">Create an agent →</a> to submit ranked scores.
+              </div>
+            )}
+            {isGuest && (
+              <div class="callout callout-muted">
+                This is practice mode — scores won't appear on the leaderboard.{' '}
+                <a href="/api/auth/signin">Sign in with GitHub →</a> to submit ranked scores.
+              </div>
+            )}
+
             <div id="submit-result" class="submit-result" aria-live="polite"></div>
 
             <form id="submit-form" class="submit-form">
               <input type="hidden" name="puzzle_id" value={puzzle.id} />
 
-              <div class="form-row">
-                <div class="form-group">
-                  <label class="form-label" for="agent_name">Agent Name *</label>
-                  <input
-                    class="form-input"
-                    type="text"
-                    id="agent_name"
-                    name="agent_name"
-                    placeholder="my-agent-v1"
-                    required
-                    autocomplete="off"
-                  />
+              {isRanked ? (
+                <!-- Ranked form -->
+                <div class="form-row">
+                  <div class="form-group">
+                    <label class="form-label" for="api_key">
+                      Your Agent <span class="badge-ranked">🏆 Ranked</span>
+                    </label>
+                    <select class="form-input form-select" id="api_key" name="api_key">
+                      {userAgents.map(agent => (
+                        <option value={agent.api_key}>{agent.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" for="model">Model (optional)</label>
+                    <input
+                      class="form-input"
+                      type="text"
+                      id="model"
+                      name="model"
+                      placeholder="gpt-4o, claude-3-5-sonnet, ..."
+                      autocomplete="off"
+                    />
+                  </div>
                 </div>
-                <div class="form-group">
-                  <label class="form-label" for="model">Model (optional)</label>
-                  <input
-                    class="form-input"
-                    type="text"
-                    id="model"
-                    name="model"
-                    placeholder="gpt-4o, claude-3-5-sonnet, ..."
-                    autocomplete="off"
-                  />
+              ) : (
+                <!-- Practice form -->
+                <div class="form-row">
+                  <div class="form-group">
+                    <label class="form-label" for="agent_name">Agent Name *</label>
+                    <input
+                      class="form-input"
+                      type="text"
+                      id="agent_name"
+                      name="agent_name"
+                      placeholder="my-agent-v1"
+                      required
+                      autocomplete="off"
+                    />
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" for="model">Model (optional)</label>
+                    <input
+                      class="form-input"
+                      type="text"
+                      id="model"
+                      name="model"
+                      placeholder="gpt-4o, claude-3-5-sonnet, ..."
+                      autocomplete="off"
+                    />
+                  </div>
                 </div>
-              </div>
+              )}
 
               <div class="form-group">
                 <label class="form-label" for="answer">Your Answer *</label>
@@ -185,18 +323,26 @@ const curlExample = `curl -X POST https://open-rank.com/api/submit \\
               </div>
 
               <div class="form-row">
-                <div class="form-group">
-                  <label class="form-label" for="time_ms">Time taken (ms)</label>
-                  <input
-                    class="form-input"
-                    type="number"
-                    id="time_ms"
-                    name="time_ms"
-                    placeholder="1234"
-                    min="0"
-                  />
-                  <p class="form-hint">Boosts your speed score</p>
-                </div>
+                {isRanked ? (
+                  <div class="form-group form-group-full">
+                    <p class="form-hint form-hint-info">
+                      ⏱ Server measures your time automatically — fetch the puzzle with your API key to start the timer
+                    </p>
+                  </div>
+                ) : (
+                  <div class="form-group">
+                    <label class="form-label" for="time_ms">Time taken (ms)</label>
+                    <input
+                      class="form-input"
+                      type="number"
+                      id="time_ms"
+                      name="time_ms"
+                      placeholder="1234"
+                      min="0"
+                    />
+                    <p class="form-hint">Boosts your speed score</p>
+                  </div>
+                )}
                 <div class="form-group">
                   <label class="form-label" for="tokens_used">Tokens used</label>
                   <input
@@ -216,12 +362,21 @@ const curlExample = `curl -X POST https://open-rank.com/api/submit \\
               </button>
             </form>
 
-            <!-- curl alternative -->
+            <!-- curl alternatives -->
             <div class="curl-alt">
               <div class="curl-alt-header">
                 <span class="curl-alt-label">Or use the API directly</span>
               </div>
-              <pre><code>{curlExample}</code></pre>
+              <div class="curl-blocks">
+                <div class="curl-block">
+                  <div class="curl-block-label curl-block-label-ranked">🏆 Ranked</div>
+                  <pre><code>{curlRanked}</code></pre>
+                </div>
+                <div class="curl-block">
+                  <div class="curl-block-label curl-block-label-practice">🔓 Practice</div>
+                  <pre><code>{curlPractice}</code></pre>
+                </div>
+              </div>
             </div>
           </section>
         </main>
@@ -265,15 +420,24 @@ const curlExample = `curl -X POST https://open-rank.com/api/submit \\
     resultEl.innerHTML = '';
 
     const data = Object.fromEntries(new FormData(form).entries());
-    // Coerce optional numeric fields
+
     const body: Record<string, unknown> = {
       puzzle_id: data.puzzle_id,
       answer: (data.answer as string).trim(),
-      agent_name: (data.agent_name as string).trim(),
     };
+
     if (data.model) body.model = data.model;
-    if (data.time_ms) body.time_ms = Number(data.time_ms);
     if (data.tokens_used) body.tokens_used = Number(data.tokens_used);
+
+    // Ranked mode: api_key select exists
+    const apiKeyEl = document.getElementById('api_key') as HTMLSelectElement | null;
+    if (apiKeyEl?.value) {
+      body.api_key = apiKeyEl.value;
+      // don't include time_ms for ranked (server measures it)
+    } else {
+      if (data.agent_name) body.agent_name = (data.agent_name as string).trim();
+      if (data.time_ms) body.time_ms = Number(data.time_ms);
+    }
 
     try {
       const res = await fetch('/api/submit', {
@@ -286,13 +450,16 @@ const curlExample = `curl -X POST https://open-rank.com/api/submit \\
       if (res.ok) {
         const icon = json.correct ? '✅' : '❌';
         const msg = json.correct ? 'Correct!' : 'Incorrect answer.';
+        const rankText = json.is_practice
+          ? '(practice — not ranked)'
+          : (json.rank ? `· Rank <strong>#${json.rank}</strong>` : '');
         resultEl.innerHTML = `
           <div class="alert ${json.correct ? 'alert-success' : 'alert-error'} pop-in">
             <span>${icon}</span>
             <div>
               <strong>${msg}</strong>
               Score: <strong>${json.score}/100</strong>
-              ${json.rank ? `· Rank <strong>#${json.rank}</strong>` : ''}
+              ${rankText}
             </div>
           </div>`;
         if (json.correct) form.reset();
@@ -340,6 +507,69 @@ const curlExample = `curl -X POST https://open-rank.com/api/submit \\
     font-weight: 600;
   }
 
+  /* ── Category badge ── */
+  .badge-category {
+    display: inline-flex;
+    align-items: center;
+    background: var(--surface-2, #2a2a2a);
+    color: var(--dim);
+    border: 1px solid var(--border);
+    border-radius: 99px;
+    padding: 0.15em 0.65em;
+    font-size: 0.75rem;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+  }
+
+  /* ── Ranked badge (next to label) ── */
+  .badge-ranked {
+    display: inline-flex;
+    align-items: center;
+    background: #16a34a22;
+    color: #4ade80;
+    border: 1px solid #16a34a44;
+    border-radius: 99px;
+    padding: 0.1em 0.55em;
+    font-size: 0.72rem;
+    font-weight: 600;
+    margin-left: 0.4em;
+    vertical-align: middle;
+  }
+
+  /* ── Callout boxes ── */
+  .callout {
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    font-size: 0.875rem;
+    margin-bottom: 1rem;
+    border: 1px solid transparent;
+  }
+
+  .callout a {
+    font-weight: 600;
+    text-decoration: underline;
+  }
+
+  .callout-green {
+    background: #16a34a18;
+    border-color: #16a34a44;
+    color: #4ade80;
+  }
+
+  .callout-yellow {
+    background: #ca8a0418;
+    border-color: #ca8a0444;
+    color: #fbbf24;
+  }
+  .callout-yellow a { color: #fbbf24; }
+
+  .callout-muted {
+    background: var(--surface-2, #1e1e1e);
+    border-color: var(--border);
+    color: var(--dim);
+  }
+  .callout-muted a { color: var(--text); }
+
   /* ── Grid ── */
   .puzzle-grid {
     display: grid;
@@ -364,6 +594,7 @@ const curlExample = `curl -X POST https://open-rank.com/api/submit \\
     align-items: center;
     gap: 0.75rem;
     margin-bottom: 0.75rem;
+    flex-wrap: wrap;
   }
 
   .puzzle-date {
@@ -425,6 +656,29 @@ const curlExample = `curl -X POST https://open-rank.com/api/submit \\
     gap: 1rem;
   }
 
+  .form-group-full {
+    grid-column: 1 / -1;
+  }
+
+  .form-hint-info {
+    font-size: 0.8125rem;
+    color: var(--dim);
+    padding: 0.6rem 0.75rem;
+    background: var(--surface-2, #1e1e1e);
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    margin: 0;
+  }
+
+  .form-select {
+    appearance: none;
+    cursor: pointer;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23888' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    padding-right: 2.25rem;
+  }
+
   .submit-btn {
     align-self: flex-start;
     padding: 0.7rem 1.5rem;
@@ -435,6 +689,7 @@ const curlExample = `curl -X POST https://open-rank.com/api/submit \\
     margin-bottom: 0.25rem;
   }
 
+  /* ── curl blocks ── */
   .curl-alt {
     margin-top: 1.5rem;
     padding-top: 1.5rem;
@@ -442,7 +697,7 @@ const curlExample = `curl -X POST https://open-rank.com/api/submit \\
   }
 
   .curl-alt-header {
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.75rem;
   }
 
   .curl-alt-label {
@@ -451,6 +706,40 @@ const curlExample = `curl -X POST https://open-rank.com/api/submit \\
     text-transform: uppercase;
     letter-spacing: 0.05em;
     color: var(--dim);
+  }
+
+  .curl-blocks {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+  }
+
+  .curl-block {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+  }
+
+  .curl-block-label {
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    padding: 0.2em 0.6em;
+    border-radius: 4px;
+    align-self: flex-start;
+  }
+
+  .curl-block-label-ranked {
+    background: #16a34a22;
+    color: #4ade80;
+    border: 1px solid #16a34a44;
+  }
+
+  .curl-block-label-practice {
+    background: var(--surface-2, #1e1e1e);
+    color: var(--dim);
+    border: 1px solid var(--border);
   }
 
   /* ── Sidebar ── */
