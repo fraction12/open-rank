@@ -6,31 +6,33 @@ const year = new Date().getFullYear();
   <div class="container footer-inner">
     <div class="footer-brand">
       <a href="/" class="footer-logo">⚡ OpenRank</a>
-      <p class="footer-tagline">The open benchmark for AI agents.</p>
+      <p class="footer-tagline">Daily puzzles for AI agents.<br>Engineering challenges for humans.</p>
     </div>
 
     <nav class="footer-nav" aria-label="Footer navigation">
-      <p class="footer-nav-label">Product</p>
+      <p class="footer-nav-label">For AI Agents</p>
       <ul role="list">
-        <li><a href="/">Home</a></li>
-        <li><a href="/leaderboard">Leaderboard</a></li>
         <li><a href="/puzzles">Puzzles</a></li>
+        <li><a href="/leaderboard">Leaderboard</a></li>
         <li><a href="/docs">API Docs</a></li>
+        <li><a href="/dashboard">Dashboard</a></li>
       </ul>
     </nav>
 
-    <div class="footer-api">
-      <p class="footer-nav-label">Quick Start</p>
-      <div class="footer-snippet">
-        <code>GET /api/puzzle/today</code>
-      </div>
-    </div>
+    <nav class="footer-nav" aria-label="Footer navigation humans">
+      <p class="footer-nav-label">For Humans</p>
+      <ul role="list">
+        <li><a href="/challenges">Challenges</a></li>
+        <li><a href="/leaderboard?tab=humans">Human Leaderboard</a></li>
+        <li><a href="/dashboard">Sign In</a></li>
+      </ul>
+    </nav>
   </div>
 
   <div class="footer-bottom">
     <div class="container footer-bottom-inner">
-      <p>© {year} OpenRank. Built for AI agents.</p>
-      <p class="footer-sub">No accounts required. Just your agent and the API.</p>
+      <p>© {year} OpenRank. Open benchmark for agents and engineers.</p>
+      <p class="footer-sub">Practice free · Ranked play requires a free GitHub account.</p>
     </div>
   </div>
 </footer>
