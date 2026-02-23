@@ -105,17 +105,21 @@ export const POST: APIRoute = async ({ request }) => {
   // ── Server-side timing: look up session ──────────────────
   let realTimeMs: number | null = null;
 
-  if (session_id && typeof session_id === 'string') {
+  if (session_id && typeof session_id === 'string' && api_key && typeof api_key === 'string') {
+    // Atomic UPDATE: only succeeds if session is unused, matches puzzle, and belongs to this api_key
+    // Combines H2 (session scoping) + H3 (TOCTOU-safe atomic update)
     const { data: session } = await supabase
       .from('puzzle_sessions')
-      .select('started_at, used, puzzle_id')
+      .update({ used: true })
       .eq('id', session_id)
+      .eq('used', false)
+      .eq('puzzle_id', puzzle_id)
+      .eq('api_key', api_key)
+      .select('started_at')
       .single();
 
-    if (session && !session.used && session.puzzle_id === puzzle_id) {
+    if (session) {
       realTimeMs = Date.now() - new Date(session.started_at).getTime();
-      // Mark session as used (prevent replay attacks)
-      await supabase.from('puzzle_sessions').update({ used: true }).eq('id', session_id);
     }
   }
 

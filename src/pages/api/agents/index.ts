@@ -1,5 +1,6 @@
 import type { APIRoute } from 'astro';
 import { getCurrentUser, supabaseAdmin } from '../../../lib/supabase';
+import { checkRateLimit } from '../../../lib/rate-limit';
 import { corsHeaders } from '../../../lib/cors';
 
 export const OPTIONS: APIRoute = async ({ request }) => {
@@ -29,6 +30,12 @@ export const POST: APIRoute = async ({ cookies, request }) => {
   if (!user) return json({ error: 'Unauthorized' }, 401, cors);
 
   if (!supabaseAdmin) return json({ error: 'Database not configured' }, 503, cors);
+
+  // Rate limit: 5 agent creations per user per hour
+  const rl = await checkRateLimit(`agent_create:${user.id}`, 5, 60 * 60 * 1000);
+  if (!rl.allowed) {
+    return json({ error: 'Too many agents created. Try again later.' }, 429, cors);
+  }
 
   const body = await request.json().catch(() => ({})) as Record<string, unknown>;
   const name = (body.name as string | undefined)?.trim();

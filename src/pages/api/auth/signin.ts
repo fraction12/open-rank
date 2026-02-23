@@ -1,7 +1,17 @@
 import type { APIRoute } from 'astro';
 import { createServerClient } from '@supabase/ssr';
+import { checkRateLimit } from '../../../lib/rate-limit';
 
-export const GET: APIRoute = async ({ cookies, redirect }) => {
+export const GET: APIRoute = async ({ cookies, redirect, request }) => {
+  // Rate limit: 10 sign-in attempts per IP per minute
+  const ip = request.headers.get('x-forwarded-for') ?? 'unknown';
+  const rl = await checkRateLimit(`signin:${ip}`, 10, 60 * 1000);
+  if (!rl.allowed) {
+    return new Response(JSON.stringify({ error: 'Too many requests' }), {
+      status: 429,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
   const supabaseUrl = (typeof process !== 'undefined' ? process.env['SUPABASE_URL'] : undefined) || import.meta.env.SUPABASE_URL as string;
   const supabaseAnonKey = (typeof process !== 'undefined' ? process.env['SUPABASE_ANON_KEY'] : undefined) || import.meta.env.SUPABASE_ANON_KEY as string;
 
