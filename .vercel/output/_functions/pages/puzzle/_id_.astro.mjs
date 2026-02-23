@@ -15,11 +15,21 @@ const $$id = createComponent(async ($$result, $$props, $$slots) => {
   let puzzle = null;
   let leaderboard = [];
   if (supabase && id) {
-    const { data: p } = await supabase.from("puzzles").select("*").eq("id", id).single();
+    const { data: p } = await supabase.from("puzzles").select("id, title, description, difficulty, input_data, release_date, created_at").eq("id", id).single();
     puzzle = p ?? null;
     if (puzzle) {
-      const { data: subs } = await supabase.from("submissions").select("*").eq("puzzle_id", id).order("score", { ascending: false }).limit(10);
-      leaderboard = (subs ?? []).map((s, i) => ({ ...s, rank: i + 1 }));
+      const { data: subs } = await supabase.rpc("leaderboard_by_puzzle", {
+        p_puzzle_id: id,
+        p_limit: 10
+      });
+      leaderboard = (subs ?? []).map((s, i) => ({
+        ...s,
+        id: "",
+        puzzle_id: id,
+        answer_hash: "",
+        correct: true,
+        rank: i + 1
+      }));
     }
   }
   if (!puzzle) {

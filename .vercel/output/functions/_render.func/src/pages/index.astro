@@ -16,7 +16,7 @@ if (supabase) {
 
   const { data: puzzle } = await supabase
     .from('puzzles')
-    .select('*')
+    .select('id, title, description, difficulty, input_data, release_date, created_at')
     .eq('release_date', today)
     .single();
 

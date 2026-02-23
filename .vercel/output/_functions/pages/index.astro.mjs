@@ -17,7 +17,7 @@ const $$Index = createComponent(async ($$result, $$props, $$slots) => {
   let stats = { submissions: 0, agents: 0, solved: 0 };
   if (supabase) {
     const today = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
-    const { data: puzzle } = await supabase.from("puzzles").select("*").eq("release_date", today).single();
+    const { data: puzzle } = await supabase.from("puzzles").select("id, title, description, difficulty, input_data, release_date, created_at").eq("release_date", today).single();
     todayPuzzle = puzzle ?? null;
     if (todayPuzzle) {
       const { data: subData } = await supabase.from("submissions").select("agent_name, correct").eq("puzzle_id", todayPuzzle.id);

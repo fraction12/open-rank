@@ -1,74 +1,43 @@
 import type { APIRoute } from 'astro';
 import { supabase } from '../../../lib/supabase';
+import { corsHeaders } from '../../../lib/cors';
 
-export const GET: APIRoute = async () => {
+export const GET: APIRoute = async ({ request }) => {
+  const cors = corsHeaders(request);
+
   if (!supabase) {
-    return new Response(JSON.stringify({ error: 'Database not configured' }), {
-      status: 503,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return json({ error: 'Database not configured' }, 503, cors);
   }
 
-  // Pull all correct submissions with puzzle info
-  const { data, error } = await supabase
-    .from('submissions')
-    .select('agent_name, model, score, puzzle_id, submitted_at')
-    .order('score', { ascending: false });
+  // Use RPC to get global leaderboard (best score per agent per puzzle, summed)
+  const { data, error } = await supabase.rpc('leaderboard_global', { p_limit: 100 });
 
   if (error) {
-    return new Response(JSON.stringify({ error: 'Query failed' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return json({ error: 'Query failed' }, 500, cors);
   }
 
-  // Aggregate: per agent, take best score per puzzle, sum across puzzles
-  type AgentData = {
-    model: string | null;
-    bestPerPuzzle: Map<string, number>;
-    lastSubmitted: string;
-    puzzlesSolved: number;
-  };
+  const entries = (data ?? []).map((row: {
+    agent_name: string;
+    total_score: number;
+    puzzles_solved: number;
+    best_model: string | null;
+  }, i: number) => ({
+    rank: i + 1,
+    agent_name: row.agent_name,
+    model: row.best_model,
+    total_score: Math.round(row.total_score),
+    puzzles_solved: row.puzzles_solved,
+  }));
 
-  const agentMap = new Map<string, AgentData>();
-
-  for (const row of data ?? []) {
-    if (!agentMap.has(row.agent_name)) {
-      agentMap.set(row.agent_name, {
-        model: row.model,
-        bestPerPuzzle: new Map(),
-        lastSubmitted: row.submitted_at,
-        puzzlesSolved: 0,
-      });
-    }
-
-    const agent = agentMap.get(row.agent_name)!;
-    const prev = agent.bestPerPuzzle.get(row.puzzle_id) ?? 0;
-    if (row.score > prev) {
-      agent.bestPerPuzzle.set(row.puzzle_id, row.score);
-    }
-  }
-
-  const entries = Array.from(agentMap.entries())
-    .map(([name, d]) => {
-      const totalScore = Array.from(d.bestPerPuzzle.values()).reduce((a, b) => a + b, 0);
-      return {
-        agent_name: name,
-        model: d.model,
-        total_score: Math.round(totalScore),
-        puzzles_solved: d.bestPerPuzzle.size,
-        last_submitted: d.lastSubmitted,
-      };
-    })
-    .sort((a, b) => b.total_score - a.total_score)
-    .slice(0, 100)
-    .map((e, i) => ({ rank: i + 1, ...e }));
-
-  return new Response(JSON.stringify({ entries }), {
-    status: 200,
-    headers: {
-      'Content-Type': 'application/json',
-      'Cache-Control': 'public, max-age=30, stale-while-revalidate=60',
-    },
+  return json({ entries }, 200, {
+    ...cors,
+    'Cache-Control': 'public, max-age=30, stale-while-revalidate=60',
   });
 };
+
+function json(data: unknown, status: number, headers: Record<string, string> = {}) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { 'Content-Type': 'application/json', ...headers },
+  });
+}

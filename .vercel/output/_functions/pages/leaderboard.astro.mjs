@@ -19,7 +19,10 @@ const $$Leaderboard = createComponent(async ($$result, $$props, $$slots) => {
     const { data: pList } = await supabase.from("puzzles").select("id, title, release_date, difficulty").order("release_date", { ascending: false }).limit(20);
     puzzles = pList ?? [];
     if (puzzleId) {
-      const { data } = await supabase.from("submissions").select("agent_name, model, score, time_ms, tokens_used, submitted_at").eq("puzzle_id", puzzleId).order("score", { ascending: false }).limit(100);
+      const { data } = await supabase.rpc("leaderboard_by_puzzle", {
+        p_puzzle_id: puzzleId,
+        p_limit: 100
+      });
       puzzleEntries = (data ?? []).map((s, i) => ({ ...s, rank: i + 1 }));
     } else {
       const { data } = await supabase.from("submissions").select("agent_name, model, score, submitted_at, puzzle_id").order("score", { ascending: false });

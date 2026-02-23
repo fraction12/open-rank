@@ -1,54 +1,34 @@
 import { s as supabase } from '../../chunks/supabase_C4BMIjoJ.mjs';
+import { c as corsHeaders } from '../../chunks/cors_CyQSzBcn.mjs';
 export { renderers } from '../../renderers.mjs';
 
-const GET = async () => {
+const GET = async ({ request }) => {
+  const cors = corsHeaders(request);
   if (!supabase) {
-    return new Response(JSON.stringify({ error: "Database not configured" }), {
-      status: 503,
-      headers: { "Content-Type": "application/json" }
-    });
+    return json({ error: "Database not configured" }, 503, cors);
   }
-  const { data, error } = await supabase.from("submissions").select("agent_name, model, score, puzzle_id, submitted_at").order("score", { ascending: false });
+  const { data, error } = await supabase.rpc("leaderboard_global", { p_limit: 100 });
   if (error) {
-    return new Response(JSON.stringify({ error: "Query failed" }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" }
-    });
+    return json({ error: "Query failed" }, 500, cors);
   }
-  const agentMap = /* @__PURE__ */ new Map();
-  for (const row of data ?? []) {
-    if (!agentMap.has(row.agent_name)) {
-      agentMap.set(row.agent_name, {
-        model: row.model,
-        bestPerPuzzle: /* @__PURE__ */ new Map(),
-        lastSubmitted: row.submitted_at,
-        puzzlesSolved: 0
-      });
-    }
-    const agent = agentMap.get(row.agent_name);
-    const prev = agent.bestPerPuzzle.get(row.puzzle_id) ?? 0;
-    if (row.score > prev) {
-      agent.bestPerPuzzle.set(row.puzzle_id, row.score);
-    }
-  }
-  const entries = Array.from(agentMap.entries()).map(([name, d]) => {
-    const totalScore = Array.from(d.bestPerPuzzle.values()).reduce((a, b) => a + b, 0);
-    return {
-      agent_name: name,
-      model: d.model,
-      total_score: Math.round(totalScore),
-      puzzles_solved: d.bestPerPuzzle.size,
-      last_submitted: d.lastSubmitted
-    };
-  }).sort((a, b) => b.total_score - a.total_score).slice(0, 100).map((e, i) => ({ rank: i + 1, ...e }));
-  return new Response(JSON.stringify({ entries }), {
-    status: 200,
-    headers: {
-      "Content-Type": "application/json",
-      "Cache-Control": "public, max-age=30, stale-while-revalidate=60"
-    }
+  const entries = (data ?? []).map((row, i) => ({
+    rank: i + 1,
+    agent_name: row.agent_name,
+    model: row.best_model,
+    total_score: Math.round(row.total_score),
+    puzzles_solved: row.puzzles_solved
+  }));
+  return json({ entries }, 200, {
+    ...cors,
+    "Cache-Control": "public, max-age=30, stale-while-revalidate=60"
   });
 };
+function json(data, status, headers = {}) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { "Content-Type": "application/json", ...headers }
+  });
+}
 
 const _page = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
   __proto__: null,

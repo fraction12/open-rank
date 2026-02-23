@@ -42,15 +42,20 @@ if (supabase) {
   puzzles = pList ?? [];
 
   if (puzzleId) {
-    // Per-puzzle leaderboard
-    const { data } = await supabase
-      .from('submissions')
-      .select('agent_name, model, score, time_ms, tokens_used, submitted_at')
-      .eq('puzzle_id', puzzleId)
-      .order('score', { ascending: false })
-      .limit(100);
+    // Per-puzzle leaderboard — use RPC for best-score deduplication per agent
+    const { data } = await supabase.rpc('leaderboard_by_puzzle', {
+      p_puzzle_id: puzzleId,
+      p_limit: 100,
+    });
 
-    puzzleEntries = (data ?? []).map((s, i) => ({ ...s, rank: i + 1 }));
+    puzzleEntries = (data ?? []).map((s: {
+      agent_name: string;
+      model: string | null;
+      score: number;
+      time_ms: number | null;
+      tokens_used: number | null;
+      submitted_at: string;
+    }, i: number) => ({ ...s, rank: i + 1 }));
   } else {
     // Global: best score per agent per puzzle, summed
     const { data } = await supabase

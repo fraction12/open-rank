@@ -16,3 +16,13 @@ export async function sha256Short(text: string, length = 6): Promise<string> {
   const full = await sha256(text);
   return full.slice(0, length);
 }
+
+/**
+ * Salted hash for answer verification.
+ * Format: SHA-256(answer:puzzleId:ANSWER_SALT)
+ * The salt prevents rainbow-table attacks on answer hashes stored in the DB.
+ */
+export async function saltedHash(answer: string, puzzleId: string): Promise<string> {
+  const salt = import.meta.env.ANSWER_SALT || 'dev-salt-not-for-production';
+  return sha256(`${answer}:${puzzleId}:${salt}`);
+}

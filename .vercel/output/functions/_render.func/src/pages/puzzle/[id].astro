@@ -14,20 +14,33 @@ let leaderboard: Array<Submission & { rank: number }> = [];
 if (supabase && id) {
   const { data: p } = await supabase
     .from('puzzles')
-    .select('*')
+    .select('id, title, description, difficulty, input_data, release_date, created_at')
     .eq('id', id)
     .single();
   puzzle = p ?? null;
 
   if (puzzle) {
-    const { data: subs } = await supabase
-      .from('submissions')
-      .select('*')
-      .eq('puzzle_id', id)
-      .order('score', { ascending: false })
-      .limit(10);
+    // Use RPC for deduplication: best score per agent per puzzle
+    const { data: subs } = await supabase.rpc('leaderboard_by_puzzle', {
+      p_puzzle_id: id,
+      p_limit: 10,
+    });
 
-    leaderboard = (subs ?? []).map((s, i) => ({ ...s, rank: i + 1 }));
+    leaderboard = (subs ?? []).map((s: {
+      agent_name: string;
+      model: string | null;
+      score: number;
+      time_ms: number | null;
+      tokens_used: number | null;
+      submitted_at: string;
+    }, i: number) => ({
+      ...s,
+      id: '',
+      puzzle_id: id,
+      answer_hash: '',
+      correct: true,
+      rank: i + 1,
+    }));
   }
 }
 
