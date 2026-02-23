@@ -1,0 +1,14 @@
+---
+interface Props {
+  icon?: string;
+  title: string;
+  body?: string;
+}
+const { icon = '🔍', title, body } = Astro.props;
+---
+<div class="empty-state">
+  {icon && <span class="empty-icon">{icon}</span>}
+  <h3>{title}</h3>
+  {body && <p>{body}</p>}
+  <slot />
+</div>

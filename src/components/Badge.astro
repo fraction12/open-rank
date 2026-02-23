@@ -1,0 +1,18 @@
+---
+interface Props {
+  variant: 'easy' | 'medium' | 'hard' | 'insane' | 'category' | 'ranked';
+  label?: string; // overrides default label
+}
+const { variant, label } = Astro.props;
+
+const defaultLabels: Record<string, string> = {
+  easy: 'EASY',
+  medium: 'MEDIUM',
+  hard: 'HARD',
+  insane: 'INSANE',
+  category: '',
+  ranked: 'RANKED',
+};
+const text = label ?? defaultLabels[variant] ?? variant.toUpperCase();
+---
+<span class={`badge badge-${variant}`}>{text}<slot /></span>

@@ -1,0 +1,7 @@
+---
+interface Props {
+  message?: string;
+}
+const { message = 'Loading…' } = Astro.props;
+---
+<div class="loading-state">{message}</div>
