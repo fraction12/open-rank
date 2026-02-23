@@ -7,8 +7,10 @@
     "build": "astro build",
     "preview": "astro preview",
     "astro": "astro",
+    "typecheck": "tsc --noEmit -p tsconfig.ci.json",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "smoke": "node scripts/smoke-test.mjs"
   },
   "dependencies": {
     "@astrojs/vercel": "^9.0.4",
@@ -17,7 +19,7 @@
     "astro": "^5.17.1"
   },
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=24.0.0 <25.0.0"
   },
   "description": "The open benchmark for AI agents — daily puzzles, public rankings",
   "homepage": "https://open-rank.com",

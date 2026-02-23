@@ -1,7 +1,8 @@
 import type { APIRoute } from 'astro';
 import { supabase } from '../../../lib/supabase';
 import { corsHeaders } from '../../../lib/cors';
-import { json } from '../../../lib/response';
+import { json, jsonError } from '../../../lib/response';
+import { parsePositiveInt } from '../../../lib/validation';
 
 const VALID_CATEGORIES = [
   'data_analysis', 'coding', 'cipher_reasoning', 'multi_step',
@@ -13,13 +14,20 @@ export const GET: APIRoute = async ({ request }) => {
   const cors = corsHeaders(request);
 
   if (!supabase) {
-    return json({ error: 'Database not configured' }, 503, cors);
+    return jsonError('Database not configured', 503, 'DB_UNAVAILABLE', cors);
   }
 
   const url = new URL(request.url);
   const categoryParam = url.searchParams.get('category');
+  const limit = parsePositiveInt(url.searchParams.get('limit'), 100, 1, 200);
+  const page = parsePositiveInt(url.searchParams.get('page'), 1, 1, 1000);
+  const offset = (page - 1) * limit;
 
   // Validate category param if provided
+  if (categoryParam && !(VALID_CATEGORIES as readonly string[]).includes(categoryParam)) {
+    return jsonError('Invalid category', 400, 'INVALID_INPUT', cors);
+  }
+
   const category = (VALID_CATEGORIES as readonly string[]).includes(categoryParam ?? '')
     ? (categoryParam as PuzzleCategory)
     : null;
@@ -30,14 +38,14 @@ export const GET: APIRoute = async ({ request }) => {
     // Per-category leaderboard via RPC
     const { data, error } = await supabase.rpc('leaderboard_by_category', {
       p_category: category,
-      p_limit: 100,
+      p_limit: Math.min(1000, offset + limit),
     });
 
     if (error) {
-      return json({ error: 'Query failed' }, 500, cors);
+      return jsonError('Query failed', 500, 'QUERY_FAILED', cors);
     }
 
-    entries = (data ?? []).map((row: {
+    entries = (data ?? []).slice(offset, offset + limit).map((row: {
       rank: number;
       github_login: string | null;
       agent_name: string;
@@ -58,13 +66,14 @@ export const GET: APIRoute = async ({ request }) => {
     }));
   } else {
     // Global leaderboard via RPC
-    const { data, error } = await supabase.rpc('leaderboard_global', { p_limit: 100 });
+    const { data, error } = await supabase.rpc('leaderboard_global', { p_limit: Math.min(1000, offset + limit) });
 
     if (error) {
-      return json({ error: 'Query failed' }, 500, cors);
+      return jsonError('Query failed', 500, 'QUERY_FAILED', cors);
     }
 
-    entries = (data ?? []).map((row: {
+    entries = (data ?? []).slice(offset, offset + limit).map((row: {
+      rank?: number;
       github_login: string | null;
       agent_name: string;
       total_score: number;
@@ -73,7 +82,7 @@ export const GET: APIRoute = async ({ request }) => {
       avg_time_ms: number | null;
       avg_tokens: number | null;
     }, i: number) => ({
-      rank: i + 1,
+      rank: Number(row.rank ?? (offset + i + 1)),
       github_login: row.github_login ?? null,
       agent_name: row.agent_name,
       model: row.model,
@@ -84,7 +93,7 @@ export const GET: APIRoute = async ({ request }) => {
     }));
   }
 
-  return json({ entries }, 200, {
+  return json({ entries, page, limit }, 200, {
     ...cors,
     'Cache-Control': 'public, max-age=30, stale-while-revalidate=60',
   });

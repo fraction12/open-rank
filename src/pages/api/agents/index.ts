@@ -2,7 +2,8 @@ import type { APIRoute } from 'astro';
 import { getCurrentUser, supabaseAdmin } from '../../../lib/supabase';
 import { checkRateLimit } from '../../../lib/rate-limit';
 import { corsHeaders } from '../../../lib/cors';
-import { json } from '../../../lib/response';
+import { json, jsonError } from '../../../lib/response';
+import { verifyCsrfHeader } from '../../../lib/csrf';
 
 export const OPTIONS: APIRoute = async ({ request }) => {
   return new Response(null, { status: 204, headers: corsHeaders(request) });
@@ -11,9 +12,9 @@ export const OPTIONS: APIRoute = async ({ request }) => {
 export const GET: APIRoute = async ({ cookies, request }) => {
   const cors = corsHeaders(request);
   const user = await getCurrentUser(cookies);
-  if (!user) return json({ error: 'Unauthorized' }, 401, cors);
+  if (!user) return jsonError('Unauthorized', 401, 'UNAUTHORIZED', cors);
 
-  if (!supabaseAdmin) return json({ error: 'Database not configured' }, 503, cors);
+  if (!supabaseAdmin) return jsonError('Database not configured', 503, 'DB_UNAVAILABLE', cors);
 
   // Use admin client so api_key is readable server-side (anon role has api_key revoked)
   const { data } = await supabaseAdmin
@@ -27,21 +28,25 @@ export const GET: APIRoute = async ({ cookies, request }) => {
 
 export const POST: APIRoute = async ({ cookies, request }) => {
   const cors = corsHeaders(request);
+  if (!verifyCsrfHeader(request, cookies)) {
+    return jsonError('Invalid CSRF token', 403, 'CSRF_INVALID', cors);
+  }
   const user = await getCurrentUser(cookies);
-  if (!user) return json({ error: 'Unauthorized' }, 401, cors);
+  if (!user) return jsonError('Unauthorized', 401, 'UNAUTHORIZED', cors);
 
-  if (!supabaseAdmin) return json({ error: 'Database not configured' }, 503, cors);
+  if (!supabaseAdmin) return jsonError('Database not configured', 503, 'DB_UNAVAILABLE', cors);
 
   // Rate limit: 5 agent creations per user per hour
   const rl = await checkRateLimit(`agent_create:${user.id}`, 5, 60 * 60 * 1000);
   if (!rl.allowed) {
-    return json({ error: 'Too many agents created. Try again later.' }, 429, cors);
+    return jsonError('Too many agents created. Try again later.', 429, 'RATE_LIMITED', cors);
   }
 
   const body = await request.json().catch(() => ({})) as Record<string, unknown>;
   const name = (body.name as string | undefined)?.trim();
 
-  if (!name || name.length > 50) return json({ error: 'Agent name required (max 50 chars)' }, 400, cors);
+  if (!name || name.length > 50) return jsonError('Agent name required (max 50 chars)', 400, 'INVALID_INPUT', cors);
+  if (!/^[\w\s\-\.\/:]+$/i.test(name)) return jsonError('Agent name contains invalid characters', 400, 'INVALID_INPUT', cors);
 
   const { data, error } = await supabaseAdmin
     .from('agents')
@@ -51,7 +56,7 @@ export const POST: APIRoute = async ({ cookies, request }) => {
 
   if (error) {
     console.error('[agents POST] insert failed:', error.message);
-    return json({ error: 'Failed to create agent' }, 500, cors);
+    return jsonError('Failed to create agent', 500, 'INSERT_FAILED', cors);
   }
   return json(data, 201, cors);
 };

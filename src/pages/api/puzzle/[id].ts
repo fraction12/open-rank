@@ -1,18 +1,19 @@
 import type { APIRoute } from 'astro';
 import { supabaseAdmin, getAgentByKey } from '../../../lib/supabase';
 import { corsHeaders } from '../../../lib/cors';
-import { json } from '../../../lib/response';
+import { json, jsonError } from '../../../lib/response';
+import { isUuid } from '../../../lib/validation';
 
 export const GET: APIRoute = async ({ params, request }) => {
   const cors = corsHeaders(request);
   const { id } = params;
 
-  if (!id) {
-    return json({ error: 'Missing puzzle id' }, 400, cors);
+  if (!id || !isUuid(id)) {
+    return jsonError('Missing or invalid puzzle id', 400, 'INVALID_INPUT', cors);
   }
 
   if (!supabaseAdmin) {
-    return json({ error: 'Database not configured' }, 503, cors);
+    return jsonError('Database not configured', 503, 'DB_UNAVAILABLE', cors);
   }
 
   const today = new Date().toISOString().split('T')[0];
@@ -25,14 +26,14 @@ export const GET: APIRoute = async ({ params, request }) => {
     .single();
 
   if (error || !data) {
-    return json({ error: 'Puzzle not found or not yet released' }, 404, cors);
+    return jsonError('Puzzle not found or not yet released', 404, 'NOT_FOUND', cors);
   }
 
   // ── Server-side timing: create a puzzle session if API key provided ──────
   const apiKey = request.headers.get('x-api-key');
   let sessionId: string | null = null;
 
-  if (apiKey) {
+  if (apiKey && isUuid(apiKey)) {
     // Validate api key exists — uses supabaseAdmin (anon role has api_key revoked)
     const agent = await getAgentByKey(apiKey);
 

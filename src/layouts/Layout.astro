@@ -4,6 +4,7 @@ import Footer from '../components/Footer.astro';
 import '../styles/global.css';
 import '../styles/animations.css';
 import { getCurrentUser } from '../lib/supabase';
+import { ensureCsrfCookie } from '../lib/csrf';
 import type { User } from '../lib/supabase';
 
 interface Props {
@@ -32,6 +33,8 @@ try {
 } catch {
   // Not logged in or error — that's fine
 }
+
+const csrfToken = ensureCsrfCookie(Astro.cookies, Astro.url);
 ---
 
 <!doctype html>
@@ -40,6 +43,7 @@ try {
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content={description} />
+    <meta name="csrf-token" content={csrfToken} />
 
     <!-- Open Graph (Slack, LinkedIn, Facebook, Discord, iMessage) -->
     <meta property="og:type" content="website" />

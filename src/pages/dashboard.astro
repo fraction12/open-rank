@@ -1,12 +1,15 @@
 ---
 import Layout from '../layouts/Layout.astro';
 import { getCurrentUser, supabaseAdmin } from '../lib/supabase';
+import { ensureCsrfCookie } from '../lib/csrf';
 
 // ── Auth guard ───────────────────────────────────────────────────────────────
 const user = await getCurrentUser(Astro.cookies);
 if (!user) {
   return Astro.redirect('/api/auth/signin');
 }
+
+const csrfToken = ensureCsrfCookie(Astro.cookies, Astro.url);
 
 // ── Fetch agents ─────────────────────────────────────────────────────────────
 let agents: { id: string; name: string; api_key: string; created_at: string }[] = [];
@@ -44,6 +47,7 @@ if (supabaseAdmin) {
         </p>
       </div>
       <form action="/api/auth/signout" method="POST">
+        <input type="hidden" name="csrf_token" value={csrfToken} />
         <button type="submit" class="btn" style="font-size: 0.875rem; padding: 0.4rem 0.875rem; border: 1px solid var(--border); background: var(--surface); color: var(--dim); border-radius: var(--radius-sm); cursor: pointer;">
           Sign out
         </button>
@@ -152,6 +156,8 @@ if (supabaseAdmin) {
 </Layout>
 
 <script>
+  const csrfToken = (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null)?.content ?? '';
+
   // ── Copy API key ───────────────────────────────────────────────────────────
   document.querySelectorAll('.copy-btn').forEach(btn => {
     btn.addEventListener('click', async () => {
@@ -182,7 +188,10 @@ if (supabaseAdmin) {
       const agentName = (btn as HTMLElement).dataset.agentName;
       if (!confirm(`Delete agent "${agentName}"? This cannot be undone.`)) return;
 
-      const res = await fetch(`/api/agents/${agentId}`, { method: 'DELETE' });
+      const res = await fetch(`/api/agents/${agentId}`, {
+        method: 'DELETE',
+        headers: { 'X-CSRF-Token': csrfToken },
+      });
       if (res.ok || res.status === 204) {
         // Remove the row from the table
         const row = document.querySelector(`tr[data-agent-id="${agentId}"]`);
@@ -206,7 +215,7 @@ if (supabaseAdmin) {
 
     const res = await fetch('/api/agents', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
       body: JSON.stringify({ name }),
     });
 

@@ -18,7 +18,13 @@ export async function checkRateLimit(
   }
 
   // Opportunistic cleanup — fire and forget, don't await
-  supabaseAdmin.rpc('cleanup_rate_limits').then(() => {}).catch(() => {});
+  void (async () => {
+    try {
+      await supabaseAdmin.rpc('cleanup_rate_limits');
+    } catch {
+      // best effort cleanup only
+    }
+  })();
 
   try {
     // Upsert: if key exists and not expired, increment; else reset

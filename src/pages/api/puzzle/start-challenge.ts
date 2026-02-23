@@ -1,8 +1,10 @@
 import type { APIRoute } from 'astro';
 import { supabaseAdmin, getCurrentUser } from '../../../lib/supabase';
 import { corsHeaders } from '../../../lib/cors';
-import { json } from '../../../lib/response';
+import { json, jsonError } from '../../../lib/response';
 import { log } from '../../../lib/logger';
+import { verifyCsrfHeader } from '../../../lib/csrf';
+import { isUuid } from '../../../lib/validation';
 
 export const OPTIONS: APIRoute = async ({ request }) => {
   return new Response(null, { status: 204, headers: corsHeaders(request) });
@@ -19,12 +21,15 @@ export const OPTIONS: APIRoute = async ({ request }) => {
  */
 export const POST: APIRoute = async ({ request, cookies }) => {
   const cors = corsHeaders(request);
+  if (!verifyCsrfHeader(request, cookies)) {
+    return jsonError('Invalid CSRF token', 403, 'CSRF_INVALID', cors);
+  }
 
   // ── Auth: require GitHub session ─────────────────────────
   // getCurrentUser uses the cookie-based SSR client — keep as-is
   const currentUser = await getCurrentUser(cookies);
   if (!currentUser) {
-    return json({ error: 'Authentication required. Sign in with GitHub.' }, 401, cors);
+    return jsonError('Authentication required. Sign in with GitHub.', 401, 'UNAUTHORIZED', cors);
   }
 
   // ── Parse body ────────────────────────────────────────────
@@ -32,16 +37,16 @@ export const POST: APIRoute = async ({ request, cookies }) => {
   try {
     body = await request.json();
   } catch {
-    return json({ error: 'Invalid JSON body' }, 400, cors);
+    return jsonError('Invalid JSON body', 400, 'INVALID_JSON', cors);
   }
 
   const { puzzle_id } = body as { puzzle_id?: string };
-  if (!puzzle_id || typeof puzzle_id !== 'string') {
-    return json({ error: 'puzzle_id is required' }, 400, cors);
+  if (!puzzle_id || !isUuid(puzzle_id)) {
+    return jsonError('puzzle_id must be a valid UUID', 400, 'INVALID_INPUT', cors);
   }
 
   // ── Guard: supabaseAdmin required for puzzle_sessions (RLS locked) ────────
-  if (!supabaseAdmin) return json({ error: 'Database not configured' }, 503, cors);
+  if (!supabaseAdmin) return jsonError('Database not configured', 503, 'DB_UNAVAILABLE', cors);
 
   // ── Verify puzzle exists and is released ──────────────────
   // Use supabaseAdmin — anon SELECT on puzzles is revoked (H2/H5 fix)
@@ -54,7 +59,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     .single();
 
   if (puzzleErr || !puzzle) {
-    return json({ error: 'Puzzle not found or not yet released' }, 404, cors);
+    return jsonError('Puzzle not found or not yet released', 404, 'NOT_FOUND', cors);
   }
 
   // ── Check for existing unused session (via supabaseAdmin — RLS locked) ────
@@ -87,7 +92,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
 
   if (insertErr || !newSession) {
     log('error', 'Failed to create puzzle session', { message: insertErr?.message });
-    return json({ error: 'Failed to create challenge session' }, 500, cors);
+    return jsonError('Failed to create challenge session', 500, 'INSERT_FAILED', cors);
   }
 
   return json({ session_id: newSession.id }, 201, cors);

@@ -4,8 +4,10 @@ import { saltedHash } from '../../lib/hash';
 import { computeSpeedBonus, computeEfficiencyBonus, computeHumanEfficiencyBonus } from '../../lib/scoring';
 import { checkRateLimit } from '../../lib/rate-limit';
 import { corsHeaders } from '../../lib/cors';
-import { json } from '../../lib/response';
+import { json, jsonError } from '../../lib/response';
 import { log } from '../../lib/logger';
+import { isUuid } from '../../lib/validation';
+import { verifyCsrfHeader } from '../../lib/csrf';
 
 // ── OPTIONS preflight (CORS) ─────────────────────────────────────────────────
 export const OPTIONS: APIRoute = async ({ request }) => {
@@ -20,7 +22,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
   try {
     body = await request.json();
   } catch {
-    return json({ error: 'Invalid JSON body' }, 400, cors);
+    return jsonError('Invalid JSON body', 400, 'INVALID_JSON', cors);
   }
 
   // ── Extract fields ───────────────────────────────────────
@@ -52,11 +54,13 @@ export const POST: APIRoute = async ({ request, cookies }) => {
   const ai_tool = typeof body.ai_tool === 'string' ? (body.ai_tool as string).slice(0, 100) : null;
 
   // ── Validate required fields ─────────────────────────────
-  if (!puzzle_id || typeof puzzle_id !== 'string') return json({ error: 'puzzle_id is required' }, 400, cors);
-  if (!answer   || typeof answer   !== 'string') return json({ error: 'answer is required' }, 400, cors);
+  if (!puzzle_id || !isUuid(puzzle_id)) return jsonError('puzzle_id must be a valid UUID', 400, 'INVALID_INPUT', cors);
+  if (!answer || typeof answer !== 'string') return jsonError('answer is required', 400, 'INVALID_INPUT', cors);
+  if (session_id !== undefined && (!session_id || !isUuid(session_id))) return jsonError('session_id must be a valid UUID', 400, 'INVALID_INPUT', cors);
+  if (api_key !== undefined && (!api_key || !isUuid(api_key))) return jsonError('api_key must be a valid UUID', 400, 'INVALID_INPUT', cors);
 
   // ── Guard: supabaseAdmin must be available for all writes ─
-  if (!supabaseAdmin) return json({ error: 'Database not configured' }, 503, cors);
+  if (!supabaseAdmin) return jsonError('Database not configured', 503, 'DB_UNAVAILABLE', cors);
 
   // ── Human challenge path ─────────────────────────────────
   // M6 fix: Derive is_human server-side — do NOT trust the client-supplied flag.
@@ -72,6 +76,9 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     // Try to get current GitHub-authenticated user
     const currentUser = await getCurrentUser(cookies);
     if (currentUser) {
+      if (!verifyCsrfHeader(request, cookies)) {
+        return jsonError('Invalid CSRF token', 403, 'CSRF_INVALID', cors);
+      }
       // Check if a human session exists for this user+puzzle
       // Human sessions: user_id is set + api_key is null (created via start-challenge)
       const { data: humanSession } = await supabaseAdmin
@@ -128,28 +135,28 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     isPractice = false;
   } else if (api_key && typeof api_key === 'string') {
     const agent = await getAgentByKey(api_key);
-    if (!agent) return json({ error: 'Invalid API key' }, 401, cors);
+    if (!agent) return jsonError('Invalid API key', 401, 'UNAUTHORIZED', cors);
     agentId = agent.id;
     agentName = agent.name;
     isPractice = false;
   } else if (rawAgentName && typeof rawAgentName === 'string') {
     // Legacy: allow agent_name without api_key for practice mode
-    if (rawAgentName.length > 50) return json({ error: 'agent_name must be 50 characters or less' }, 400, cors);
-    if (!/^[\w\s\-\.\/:]+$/i.test(rawAgentName)) return json({ error: 'agent_name contains invalid characters' }, 400, cors);
+    if (rawAgentName.length > 50) return jsonError('agent_name must be 50 characters or less', 400, 'INVALID_INPUT', cors);
+    if (!/^[\w\s\-\.\/:]+$/i.test(rawAgentName)) return jsonError('agent_name contains invalid characters', 400, 'INVALID_INPUT', cors);
     agentName = rawAgentName.trim();
     isPractice = true; // no api_key = always practice
   }
 
   // ── Validate other inputs ────────────────────────────────
-  if (model && model.length > 100) return json({ error: 'model must be 100 characters or less' }, 400, cors);
+  if (model && model.length > 100) return jsonError('model must be 100 characters or less', 400, 'INVALID_INPUT', cors);
   if (selfReportedTimeMs !== undefined && (typeof selfReportedTimeMs !== 'number' || selfReportedTimeMs < 0 || selfReportedTimeMs > 86400000))
-    return json({ error: 'time_ms must be 0–86400000' }, 400, cors);
+    return jsonError('time_ms must be 0-86400000', 400, 'INVALID_INPUT', cors);
   if (tokens_used !== undefined && (typeof tokens_used !== 'number' || tokens_used < 0 || tokens_used > 10000000))
-    return json({ error: 'tokens_used must be 0–10000000' }, 400, cors);
+    return jsonError('tokens_used must be 0-10000000', 400, 'INVALID_INPUT', cors);
   if (skill_used && typeof skill_used !== 'string')
-    return json({ error: 'skill_used must be a string' }, 400, cors);
+    return jsonError('skill_used must be a string', 400, 'INVALID_INPUT', cors);
   if (skill_used && skill_used.length > 100)
-    return json({ error: 'skill_used too long (max 100 chars)' }, 400, cors);
+    return jsonError('skill_used too long (max 100 chars)', 400, 'INVALID_INPUT', cors);
 
   // ── Rate limiting ────────────────────────────────────────
   const ip =
@@ -163,7 +170,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     return json(
       { error: 'Rate limit exceeded. Try again later.', retry_after: rl.retryAfter },
       429,
-      cors,
+      { ...cors, 'X-RateLimit-Remaining': '0' },
     );
   }
 
@@ -177,7 +184,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     .lte('release_date', today)
     .single();
 
-  if (pErr || !puzzle) return json({ error: 'Puzzle not found or not yet released' }, 404, cors);
+  if (pErr || !puzzle) return jsonError('Puzzle not found or not yet released', 404, 'NOT_FOUND', cors);
 
   // ── Server-side timing: look up session ──────────────────
   // puzzle_sessions is now locked to service role — must use supabaseAdmin
@@ -305,7 +312,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     }
 
     log('error', 'Failed to record submission', { message: insErr?.message });
-    return json({ error: 'Failed to record submission' }, 500, cors);
+    return jsonError('Failed to record submission', 500, 'INSERT_FAILED', cors);
   }
 
   // ── Calculate rank (only among ranked submissions) ────────

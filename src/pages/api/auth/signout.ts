@@ -1,8 +1,16 @@
 import type { APIRoute } from 'astro';
 import { createServerClient } from '@supabase/ssr';
 import { AUTH_COOKIE_NAME } from '../../../lib/supabase';
+import { corsHeaders } from '../../../lib/cors';
+import { jsonError } from '../../../lib/response';
+import { verifyCsrfHeaderOrForm } from '../../../lib/csrf';
 
 export const POST: APIRoute = async ({ request, cookies, redirect }) => {
+  const cors = corsHeaders(request);
+  if (!(await verifyCsrfHeaderOrForm(request, cookies))) {
+    return jsonError('Invalid CSRF token', 403, 'CSRF_INVALID', cors);
+  }
+
   const supabaseUrl = (typeof process !== 'undefined' ? process.env['SUPABASE_URL'] : undefined) || import.meta.env.SUPABASE_URL as string;
   const supabaseAnonKey = (typeof process !== 'undefined' ? process.env['SUPABASE_ANON_KEY'] : undefined) || import.meta.env.SUPABASE_ANON_KEY as string;
 

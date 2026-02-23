@@ -262,6 +262,8 @@ const displayData = isTruncated ? inputData.slice(0, INPUT_DISPLAY_LIMIT) : inpu
 </Layout>
 
 <script define:vars={{ puzzleId: puzzle.id, isLoggedIn: !!currentUser }}>
+  const csrfToken = (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null)?.content ?? '';
+
   // ── Copy input data ──────────────────────────────────────────────────────
   document.getElementById('copy-input-btn')?.addEventListener('click', async () => {
     const text = document.getElementById('input-data-text')?.textContent ?? '';
@@ -321,7 +323,7 @@ const displayData = isTruncated ? inputData.slice(0, INPUT_DISPLAY_LIMIT) : inpu
     try {
       const res = await fetch('/api/puzzle/start-challenge', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
         body: JSON.stringify({ puzzle_id: puzzleId }),
       });
       if (!res.ok) {
@@ -374,7 +376,7 @@ const displayData = isTruncated ? inputData.slice(0, INPUT_DISPLAY_LIMIT) : inpu
     try {
       const res = await fetch('/api/submit', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
         body: JSON.stringify({
           puzzle_id: puzzleId,
           answer,

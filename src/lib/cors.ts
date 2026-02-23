@@ -12,7 +12,8 @@ export function corsHeaders(request: Request): Record<string, string> {
 
   const headers: Record<string, string> = {
     'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, X-API-Key',
+    'Access-Control-Allow-Headers': 'Content-Type, X-API-Key, X-CSRF-Token, X-Request-Id',
+    'Access-Control-Expose-Headers': 'X-Request-Id',
     'Access-Control-Allow-Credentials': 'true',
     'Access-Control-Max-Age': '86400',
     'Vary': 'Origin',
