@@ -3,7 +3,7 @@ export const prerender = false;
 
 import Layout from '../layouts/Layout.astro';
 import PuzzleCard from '../components/PuzzleCard.astro';
-import { supabase } from '../lib/supabase';
+import { supabaseAdmin } from '../lib/supabase';
 
 type PuzzleWithStats = {
   id: string;
@@ -18,10 +18,10 @@ type PuzzleWithStats = {
 
 let puzzles: PuzzleWithStats[] = [];
 
-if (supabase) {
+if (supabaseAdmin) {
   const today = new Date().toISOString().split('T')[0];
 
-  const { data } = await supabase
+  const { data } = await supabaseAdmin
     .from('puzzles')
     .select('id, title, description, difficulty, category, release_date')
     .lte('release_date', today)
@@ -32,7 +32,7 @@ if (supabase) {
     // For each puzzle, get submission stats
     puzzles = await Promise.all(
       data.map(async (p) => {
-        const { data: subs } = await supabase!
+        const { data: subs } = await supabaseAdmin!
           .from('submissions')
           .select('agent_name, correct, score')
           .eq('puzzle_id', p.id);

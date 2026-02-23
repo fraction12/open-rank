@@ -3,7 +3,7 @@ export const prerender = false;
 
 import Layout from '../../layouts/Layout.astro';
 import LeaderboardTable from '../../components/LeaderboardTable.astro';
-import { getCurrentUser, supabase, supabaseAdmin } from '../../lib/supabase';
+import { getCurrentUser, supabaseAdmin } from '../../lib/supabase';
 import type { Puzzle, Submission } from '../../lib/supabase';
 
 const { id } = Astro.params;
@@ -11,8 +11,8 @@ const { id } = Astro.params;
 let puzzle: Puzzle | null = null;
 let leaderboard: Array<Submission & { rank: number }> = [];
 
-if (supabase && id) {
-  const { data: p } = await supabase
+if (supabaseAdmin && id) {
+  const { data: p } = await supabaseAdmin
     .from('puzzles')
     .select('id, title, description, difficulty, category, input_data, release_date, created_at')
     .eq('id', id)
@@ -21,7 +21,7 @@ if (supabase && id) {
 
   if (puzzle) {
     // Use RPC for deduplication: best score per agent per puzzle
-    const { data: subs } = await supabase.rpc('leaderboard_by_puzzle', {
+    const { data: subs } = await supabaseAdmin.rpc('leaderboard_by_puzzle', {
       p_puzzle_id: id,
       p_limit: 10,
     });

@@ -4,7 +4,7 @@ export const prerender = false;
 import Layout from '../layouts/Layout.astro';
 import PuzzleCard from '../components/PuzzleCard.astro';
 import Countdown from '../components/Countdown.astro';
-import { supabase } from '../lib/supabase';
+import { supabaseAdmin } from '../lib/supabase';
 import type { Puzzle } from '../lib/supabase';
 
 // ── Fetch today's puzzle ──
@@ -12,10 +12,10 @@ let todayPuzzle: Puzzle | null = null;
 let stats = { submissions: 0, agents: 0, solved: 0 };
 let totalPuzzles: number | null = null;
 
-if (supabase) {
+if (supabaseAdmin) {
   const today = new Date().toISOString().split('T')[0];
 
-  const { data: puzzle } = await supabase
+  const { data: puzzle } = await supabaseAdmin
     .from('puzzles')
     .select('id, title, description, difficulty, category, input_data, release_date, created_at')
     .eq('release_date', today)
@@ -24,7 +24,7 @@ if (supabase) {
   todayPuzzle = puzzle ?? null;
 
   if (todayPuzzle) {
-    const { data: subData } = await supabase
+    const { data: subData } = await supabaseAdmin
       .from('submissions')
       .select('agent_name, correct')
       .eq('puzzle_id', todayPuzzle.id);
@@ -37,7 +37,7 @@ if (supabase) {
   }
 
   // Total puzzle count (all time)
-  const { count } = await supabase
+  const { count } = await supabaseAdmin
     .from('puzzles')
     .select('id', { count: 'exact', head: true });
   totalPuzzles = count;

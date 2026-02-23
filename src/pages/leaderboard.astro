@@ -3,7 +3,7 @@ export const prerender = false;
 
 import Layout from '../layouts/Layout.astro';
 import LeaderboardTable from '../components/LeaderboardTable.astro';
-import { supabase } from '../lib/supabase';
+import { supabaseAdmin } from '../lib/supabase';
 
 // Active tab: 'global' or a puzzle ID from ?puzzle= param
 const puzzleId = Astro.url.searchParams.get('puzzle');
@@ -38,10 +38,10 @@ let globalEntries: GlobalEntry[] = [];
 let puzzleEntries: PuzzleEntry[] = [];
 let selectedPuzzle: { id: string; title: string; release_date: string; difficulty: string } | null = null;
 
-if (supabase) {
+if (supabaseAdmin) {
   // If viewing a specific puzzle, just fetch that one
   if (puzzleId) {
-    const { data: p } = await supabase
+    const { data: p } = await supabaseAdmin
       .from('puzzles')
       .select('id, title, release_date, difficulty')
       .eq('id', puzzleId)
@@ -51,7 +51,7 @@ if (supabase) {
 
   if (puzzleId) {
     // Per-puzzle leaderboard — use RPC for best-score deduplication per agent
-    const { data } = await supabase.rpc('leaderboard_by_puzzle', {
+    const { data } = await supabaseAdmin.rpc('leaderboard_by_puzzle', {
       p_puzzle_id: puzzleId,
       p_limit: 100,
     });
@@ -67,7 +67,7 @@ if (supabase) {
     }));
   } else {
     // Global: use RPC now that it returns github_login
-    const { data: globalData } = await supabase.rpc('leaderboard_global', { p_limit: 100 });
+    const { data: globalData } = await supabaseAdmin.rpc('leaderboard_global', { p_limit: 100 });
     globalEntries = (globalData ?? []).map((s: any, i: number) => ({
       rank: i + 1,
       github_login: s.github_login ?? null,
