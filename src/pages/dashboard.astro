@@ -1,6 +1,6 @@
 ---
 import Layout from '../layouts/Layout.astro';
-import { getCurrentUser, supabase } from '../lib/supabase';
+import { getCurrentUser, supabaseAdmin } from '../lib/supabase';
 
 // ── Auth guard ───────────────────────────────────────────────────────────────
 const user = await getCurrentUser(Astro.cookies);
@@ -10,8 +10,9 @@ if (!user) {
 
 // ── Fetch agents ─────────────────────────────────────────────────────────────
 let agents: { id: string; name: string; api_key: string; created_at: string }[] = [];
-if (supabase) {
-  const { data } = await supabase
+if (supabaseAdmin) {
+  // Use admin client so api_key is readable server-side (anon role has api_key revoked)
+  const { data } = await supabaseAdmin
     .from('agents')
     .select('id, name, api_key, created_at')
     .eq('user_id', user.id)

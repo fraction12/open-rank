@@ -1,5 +1,5 @@
 import type { APIRoute } from 'astro';
-import { supabase, supabaseAdmin } from '../../../lib/supabase';
+import { supabase, supabaseAdmin, getAgentByKey } from '../../../lib/supabase';
 import { corsHeaders } from '../../../lib/cors';
 
 export const GET: APIRoute = async ({ params, request }) => {
@@ -29,15 +29,14 @@ export const GET: APIRoute = async ({ params, request }) => {
   let sessionId: string | null = null;
 
   if (apiKey) {
-    // Validate api key exists
-    const { data: agent } = await supabase
-      .from('agents')
-      .select('id')
-      .eq('api_key', apiKey)
-      .single();
+    // Validate api key exists — uses supabaseAdmin (anon role has api_key revoked)
+    const agent = await getAgentByKey(apiKey);
 
     if (agent) {
-      const { data: session } = await supabaseAdmin!
+      if (!supabaseAdmin) {
+        return json({ error: 'Server misconfigured' }, 503, cors);
+      }
+      const { data: session } = await supabaseAdmin
         .from('puzzle_sessions')
         .insert({ puzzle_id: data.id, api_key: apiKey })
         .select('id')

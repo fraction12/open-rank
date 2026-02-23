@@ -95,11 +95,12 @@ export async function getCurrentUser(cookies: any) {
 }
 
 // ── Helper: get agent from API key ───────────────────────────────────────────
+// Uses supabaseAdmin (service role) so api_key is never exposed via anon client
 export async function getAgentByKey(apiKey: string) {
-  if (!supabase) return null;
-  const { data } = await supabase
+  if (!supabaseAdmin) return null;
+  const { data } = await supabaseAdmin
     .from('agents')
-    .select('id, name, user_id, users(github_login)')
+    .select('id, name, user_id')
     .eq('api_key', apiKey)
     .single();
   return data ?? null;

@@ -1,5 +1,5 @@
 import type { APIRoute } from 'astro';
-import { getCurrentUser, supabase, supabaseAdmin } from '../../../lib/supabase';
+import { getCurrentUser, supabaseAdmin } from '../../../lib/supabase';
 import { corsHeaders } from '../../../lib/cors';
 
 export const OPTIONS: APIRoute = async ({ request }) => {
@@ -11,9 +11,10 @@ export const GET: APIRoute = async ({ cookies, request }) => {
   const user = await getCurrentUser(cookies);
   if (!user) return json({ error: 'Unauthorized' }, 401, cors);
 
-  if (!supabase) return json({ error: 'Database not configured' }, 503, cors);
+  if (!supabaseAdmin) return json({ error: 'Database not configured' }, 503, cors);
 
-  const { data } = await supabase
+  // Use admin client so api_key is readable server-side (anon role has api_key revoked)
+  const { data } = await supabaseAdmin
     .from('agents')
     .select('id, name, api_key, created_at')
     .eq('user_id', user.id)

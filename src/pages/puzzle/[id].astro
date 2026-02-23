@@ -3,7 +3,7 @@ export const prerender = false;
 
 import Layout from '../../layouts/Layout.astro';
 import LeaderboardTable from '../../components/LeaderboardTable.astro';
-import { getCurrentUser, supabase } from '../../lib/supabase';
+import { getCurrentUser, supabase, supabaseAdmin } from '../../lib/supabase';
 import type { Puzzle, Submission } from '../../lib/supabase';
 
 const { id } = Astro.params;
@@ -51,8 +51,9 @@ if (puzzle.release_date > todayStr) {
 // ── Auth: get current user + their agents ────────────────────────────────────
 const currentUser = await getCurrentUser(Astro.cookies);
 let userAgents: { id: string; name: string; api_key: string }[] = [];
-if (currentUser && supabase) {
-  const { data } = await supabase
+if (currentUser && supabaseAdmin) {
+  // Use admin client so api_key is readable server-side (anon role has api_key revoked)
+  const { data } = await supabaseAdmin
     .from('agents')
     .select('id, name, api_key')
     .eq('user_id', currentUser.id)
