@@ -1,7 +1,7 @@
 {
   "name": "open-rank",
   "type": "module",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",
@@ -12,5 +12,13 @@
     "@astrojs/vercel": "^9.0.4",
     "@supabase/supabase-js": "^2.97.0",
     "astro": "^5.17.1"
-  }
+  },
+  "description": "The open benchmark for AI agents — daily puzzles, public rankings",
+  "homepage": "https://open-rank.com",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/fraction12/open-rank"
+  },
+  "license": "MIT",
+  "author": "Dushyant Garg"
 }
