@@ -1,5 +1,5 @@
 /**
- * Score calculation logic for AgentArena
+ * Score calculation logic for OpenRank
  * 
  * Total score breakdown:
  * - Correctness:   50 points (binary — correct or 0)
