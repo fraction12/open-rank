@@ -48,6 +48,12 @@ if (!puzzle) {
   return Astro.redirect('/archive');
 }
 
+// Return 404 for puzzles not yet released
+const todayStr = new Date().toISOString().split('T')[0];
+if (puzzle.release_date > todayStr) {
+  return new Response(null, { status: 404, statusText: 'Not Found' });
+}
+
 const isToday = puzzle.release_date === new Date().toISOString().split('T')[0];
 const difficultyColor = {
   easy: 'var(--diff-easy)',

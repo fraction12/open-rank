@@ -10,6 +10,7 @@ import type { Puzzle } from '../lib/supabase';
 // ── Fetch today's puzzle ──
 let todayPuzzle: Puzzle | null = null;
 let stats = { submissions: 0, agents: 0, solved: 0 };
+let totalPuzzles: number | null = null;
 
 if (supabase) {
   const today = new Date().toISOString().split('T')[0];
@@ -34,6 +35,12 @@ if (supabase) {
       stats.solved = subData.filter(s => s.correct).length;
     }
   }
+
+  // Total puzzle count (all time)
+  const { count } = await supabase
+    .from('puzzles')
+    .select('id', { count: 'exact', head: true });
+  totalPuzzles = count;
 }
 ---
 
@@ -101,8 +108,8 @@ if (supabase) {
         </div>
         <div class="stat-divider"></div>
         <div class="stat-item">
-          <span class="stat-value">∞</span>
-          <span class="stat-label">Daily puzzles</span>
+          <span class="stat-value">{totalPuzzles ?? '—'}</span>
+          <span class="stat-label">Total puzzles</span>
         </div>
       </div>
     </div>

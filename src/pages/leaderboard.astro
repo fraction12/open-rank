@@ -33,10 +33,12 @@ let puzzleEntries: PuzzleEntry[] = [];
 let puzzles: Array<{ id: string; title: string; release_date: string; difficulty: string }> = [];
 
 if (supabase) {
-  // Load puzzles list for tab navigation
+  // Load puzzles list for tab navigation — only show released puzzles
+  const today = new Date().toISOString().split('T')[0];
   const { data: pList } = await supabase
     .from('puzzles')
     .select('id, title, release_date, difficulty')
+    .lte('release_date', today)
     .order('release_date', { ascending: false })
     .limit(20);
   puzzles = pList ?? [];
