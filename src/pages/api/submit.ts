@@ -150,6 +150,12 @@ export const POST: APIRoute = async ({ request }) => {
   }
 
   // ── Calculate score ───────────────────────────────────────
+  // NOTE: Speed and efficiency bonuses are calculated relative to the current best
+  // at submission time. Scores are NOT retroactively updated when faster/leaner
+  // submissions arrive later. First correct submitters get max bonus by definition.
+  // This is a known tradeoff — simplicity over perfect fairness.
+  // Future: consider a nightly score recalculation job.
+  //
   // Use server-measured time if available, otherwise self-reported (for practice)
   const timeForScoring = realTimeMs ?? (isPractice ? selfReportedTimeMs : null);
 

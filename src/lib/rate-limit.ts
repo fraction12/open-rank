@@ -11,7 +11,13 @@ export async function checkRateLimit(
   maxRequests: number,
   windowMs: number,
 ): Promise<{ allowed: boolean; retryAfter?: number }> {
-  if (!supabase) return checkFallback(key, maxRequests, windowMs);
+  if (!supabase) {
+    console.warn('[rate-limit] DB-backed rate limiter unavailable, falling back to in-memory (per-instance, resets on cold start)');
+    return checkFallback(key, maxRequests, windowMs);
+  }
+
+  // Opportunistic cleanup — fire and forget, don't await
+  supabase.rpc('cleanup_rate_limits').then(() => {}).catch(() => {});
 
   try {
     // Upsert: if key exists and not expired, increment; else reset
@@ -33,6 +39,7 @@ export async function checkRateLimit(
     }
     return { allowed: true };
   } catch {
+    console.warn('[rate-limit] DB-backed rate limiter unavailable, falling back to in-memory (per-instance, resets on cold start)');
     return checkFallback(key, maxRequests, windowMs);
   }
 }

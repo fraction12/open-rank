@@ -30,30 +30,6 @@ function createAdminClient() {
 
 export const supabaseAdmin = createAdminClient();
 
-// ── Server client with cookie support (for auth) ────────────────────────────
-export function createSupabaseServerClient(cookies: any) {
-  const url = (typeof process !== 'undefined' ? process.env[urlKey] : undefined) || import.meta.env.SUPABASE_URL as string;
-  const key = (typeof process !== 'undefined' ? process.env[keyKey] : undefined) || import.meta.env.SUPABASE_ANON_KEY as string;
-
-  return createServerClient(url, key, {
-    cookies: {
-      getAll: () => {
-        // cookies is an Astro AstroCookies object
-        // We need to return all cookies as { name, value }[]
-        // But Astro's cookies object doesn't expose getAll easily,
-        // so we use the get method per name via a Proxy approach.
-        // For our auth use case, we just need to support get(name) via getAll.
-        return [];
-      },
-      setAll: () => {},
-    },
-    cookieOptions: {
-      sameSite: 'lax',
-      secure: true,
-    },
-  });
-}
-
 // ── Helper: get current user from request cookies ───────────────────────────
 export async function getCurrentUser(cookies: any) {
   if (!supabaseUrl || !supabaseAnonKey) return null;
@@ -89,8 +65,8 @@ export async function getCurrentUser(cookies: any) {
   const githubId = parseInt(String(providerId));
   if (isNaN(githubId)) return null;
 
-  if (!supabase) return null;
-  const { data } = await supabase.from('users').select('*').eq('github_id', githubId).single();
+  // Use the authenticated server client (not the global anon client) for the user row lookup
+  const { data } = await client.from('users').select('*').eq('github_id', githubId).single();
   return data ?? null;
 }
 

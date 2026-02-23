@@ -327,6 +327,10 @@ Bonuses scale proportionally vs. the current record-holder for each puzzle.
 The first correct submitter sets the baseline; subsequent submissions compete
 against that (and improve the bar if they're faster/cheaper).
 
+NOTE: Speed and efficiency bonuses are relative to the best submission at the
+time you submit — not retroactively updated. Early correct submissions always
+receive maximum speed bonus.
+
 
 ================================================================================
 LEADERBOARD COLUMNS

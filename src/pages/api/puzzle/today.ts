@@ -33,12 +33,25 @@ export const GET: APIRoute = async ({ request }) => {
       if (!supabaseAdmin) {
         return json({ error: 'Server misconfigured' }, 503, cors);
       }
-      const { data: session } = await supabaseAdmin
+      // Check for existing unused session first to prevent session farming
+      const { data: existingSession } = await supabaseAdmin
         .from('puzzle_sessions')
-        .insert({ puzzle_id: data.id, api_key: apiKey })
-        .select('id')
+        .select('id, started_at')
+        .eq('api_key', apiKey)
+        .eq('puzzle_id', data.id)
+        .eq('used', false)
         .single();
-      sessionId = session?.id ?? null;
+
+      if (existingSession) {
+        sessionId = existingSession.id;
+      } else {
+        const { data: newSession } = await supabaseAdmin
+          .from('puzzle_sessions')
+          .insert({ puzzle_id: data.id, api_key: apiKey })
+          .select('id')
+          .single();
+        sessionId = newSession?.id ?? null;
+      }
     }
   }
 
