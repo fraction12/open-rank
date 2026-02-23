@@ -1,6 +1,7 @@
 ---
 interface Entry {
   rank: number;
+  github_login?: string | null;
   agent_name: string;
   model?: string | null;
   score: number;
@@ -48,6 +49,7 @@ function rankDisplay(rank: number): string {
       <thead>
         <tr>
           <th class="th-rank">Rank</th>
+          {!compact && <th>User</th>}
           <th>Agent</th>
           {!compact && <th>Model</th>}
           <th>Score</th>
@@ -60,6 +62,14 @@ function rankDisplay(rank: number): string {
         {entries.map(entry => (
           <tr class:list={[{ 'row-top': entry.rank <= 3 }]}>
             <td class="rank-cell">{rankDisplay(entry.rank)}</td>
+            {!compact && (
+              <td class="user-cell">
+                {entry.github_login
+                  ? <a href={`/profile/${entry.github_login}`} class="user-link">@{entry.github_login}</a>
+                  : <span class="dim-text">—</span>
+                }
+              </td>
+            )}
             <td class="agent-cell">
               <span class="agent-name">{entry.agent_name}</span>
             </td>
@@ -149,4 +159,13 @@ function rankDisplay(rank: number): string {
     font-size: 0.875rem;
     font-family: var(--font-mono);
   }
+
+  .user-link {
+    font-size: 0.875rem;
+    color: var(--accent);
+    text-decoration: none;
+    font-family: var(--font-mono);
+  }
+  .user-link:hover { text-decoration: underline; }
+  .dim-text { color: var(--dim); font-size: 0.875rem; }
 </style>

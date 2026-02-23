@@ -10,16 +10,24 @@ const puzzleId = Astro.url.searchParams.get('puzzle');
 
 type GlobalEntry = {
   rank: number;
+  github_login: string | null;
   agent_name: string;
   model: string | null;
+  total_score: number;
+  puzzles_solved: number;
+  avg_time_ms: number | null;
+  avg_tokens: number | null;
+  last_submitted_at: string;
+  // mapped aliases for LeaderboardTable
   score: number;
-  time_ms: null;
-  tokens_used: null;
+  time_ms: number | null;
+  tokens_used: number | null;
   submitted_at: string;
 };
 
 type PuzzleEntry = {
   rank: number;
+  github_login: string | null;
   agent_name: string;
   model: string | null;
   score: number;
@@ -50,58 +58,30 @@ if (supabase) {
       p_limit: 100,
     });
 
-    puzzleEntries = (data ?? []).map((s: {
-      agent_name: string;
-      model: string | null;
-      score: number;
-      time_ms: number | null;
-      tokens_used: number | null;
-      submitted_at: string;
-    }, i: number) => ({ ...s, rank: i + 1 }));
+    puzzleEntries = (data ?? []).map((s: any, i: number) => ({
+      ...s,
+      rank: i + 1,
+      github_login: s.github_login ?? null,
+    }));
   } else {
-    // Global: best score per agent per puzzle, summed
-    const { data } = await supabase
-      .from('submissions')
-      .select('agent_name, model, score, submitted_at, puzzle_id')
-      .order('score', { ascending: false });
-
-    if (data) {
-      // Group: agent → puzzle → best score
-      const agentMap = new Map<string, { model: string | null; totalScore: number; puzzlesBest: Map<string, number>; submitted_at: string }>();
-      for (const row of data) {
-        if (!agentMap.has(row.agent_name)) {
-          agentMap.set(row.agent_name, {
-            model: row.model,
-            totalScore: 0,
-            puzzlesBest: new Map(),
-            submitted_at: row.submitted_at,
-          });
-        }
-        const agent = agentMap.get(row.agent_name)!;
-        const prev = agent.puzzlesBest.get(row.puzzle_id) ?? 0;
-        if (row.score > prev) {
-          agent.puzzlesBest.set(row.puzzle_id, row.score);
-        }
-      }
-
-      // Sum best scores
-      const entries: GlobalEntry[] = [];
-      for (const [name, data] of agentMap.entries()) {
-        const total = Array.from(data.puzzlesBest.values()).reduce((a, b) => a + b, 0);
-        entries.push({
-          rank: 0,
-          agent_name: name,
-          model: data.model,
-          score: Math.round(total),
-          time_ms: null,
-          tokens_used: null,
-          submitted_at: data.submitted_at,
-        });
-      }
-
-      entries.sort((a, b) => b.score - a.score);
-      globalEntries = entries.slice(0, 100).map((e, i) => ({ ...e, rank: i + 1 }));
-    }
+    // Global: use RPC now that it returns github_login
+    const { data: globalData } = await supabase.rpc('leaderboard_global', { p_limit: 100 });
+    globalEntries = (globalData ?? []).map((s: any, i: number) => ({
+      rank: i + 1,
+      github_login: s.github_login ?? null,
+      agent_name: s.agent_name,
+      model: s.model ?? null,
+      total_score: s.total_score,
+      puzzles_solved: s.puzzles_solved,
+      avg_time_ms: s.avg_time_ms ?? null,
+      avg_tokens: s.avg_tokens ?? null,
+      last_submitted_at: s.last_submitted_at,
+      // aliases for LeaderboardTable
+      score: s.total_score,
+      time_ms: s.avg_time_ms ?? null,
+      tokens_used: s.avg_tokens ?? null,
+      submitted_at: s.last_submitted_at,
+    }));
   }
 }
 
@@ -230,6 +210,7 @@ const CATEGORY_TABS = [
 
     interface LeaderEntry {
       rank: number;
+      github_login?: string | null;
       agent_name: string;
       model?: string | null;
       total_score?: number;
@@ -251,8 +232,12 @@ const CATEGORY_TABS = [
       const rows = entries.map(e => {
         const score = e.total_score ?? e.score ?? 0;
         const isTop = e.rank <= 3;
+        const userCell = e.github_login
+          ? `<a href="/profile/${e.github_login}" class="user-link">@${e.github_login}</a>`
+          : `<span class="dim-text">—</span>`;
         return `<tr class="${isTop ? 'row-top' : ''}">
           <td class="rank-cell">${rankDisplay(e.rank)}</td>
+          <td class="user-cell">${userCell}</td>
           <td class="agent-cell"><span class="agent-name">${e.agent_name}</span></td>
           <td class="model-cell"><span class="model-tag">${e.model ?? '—'}</span></td>
           <td class="score-cell">
@@ -268,6 +253,7 @@ const CATEGORY_TABS = [
       return `<div class="table-wrap"><table>
         <thead><tr>
           <th class="th-rank">Rank</th>
+          <th>User</th>
           <th>Agent</th>
           <th>Model</th>
           <th>Score</th>
@@ -530,4 +516,13 @@ const CATEGORY_TABS = [
     font-size: 0.875rem;
     font-family: var(--font-mono);
   }
+
+  :global(.user-link) {
+    font-size: 0.875rem;
+    color: var(--accent);
+    text-decoration: none;
+    font-family: var(--font-mono);
+  }
+  :global(.user-link:hover) { text-decoration: underline; }
+  :global(.dim-text) { color: var(--dim); font-size: 0.875rem; }
 </style>

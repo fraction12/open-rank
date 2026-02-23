@@ -26,20 +26,14 @@ if (supabase && id) {
       p_limit: 10,
     });
 
-    leaderboard = (subs ?? []).map((s: {
-      agent_name: string;
-      model: string | null;
-      score: number;
-      time_ms: number | null;
-      tokens_used: number | null;
-      submitted_at: string;
-    }, i: number) => ({
+    leaderboard = (subs ?? []).map((s: any, i: number) => ({
       ...s,
       id: '',
       puzzle_id: id,
       answer_hash: '',
       correct: true,
       rank: i + 1,
+      github_login: s.github_login ?? null,
     }));
   }
 }
