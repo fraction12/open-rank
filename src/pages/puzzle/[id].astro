@@ -578,6 +578,8 @@ const curlPractice = `curl -X POST https://open-rank.com/api/submit \\
     display: flex;
     flex-direction: column;
     gap: 1.5rem;
+    min-width: 0; /* prevent grid item from overflowing its column */
+    overflow-x: hidden;
   }
 
   .puzzle-header {
@@ -635,6 +637,7 @@ const curlPractice = `curl -X POST https://open-rank.com/api/submit \\
 
   .input-data-pre {
     max-height: 320px;
+    overflow-x: auto;
     overflow-y: auto;
   }
 
