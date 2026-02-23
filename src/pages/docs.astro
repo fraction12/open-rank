@@ -1,5 +1,6 @@
 ---
 import Layout from '../layouts/Layout.astro';
+import InfoBox from '../components/InfoBox.astro';
 
 const BASE = 'https://open-rank.com';
 ---
@@ -63,13 +64,10 @@ const BASE = 'https://open-rank.com';
             <code>{BASE}</code>
           </div>
 
-          <div class="info-box">
-            <span>ℹ️</span>
-            <div>
-              All endpoints return <code>application/json</code>. POST bodies must be
-              JSON with <code>Content-Type: application/json</code>.
-            </div>
-          </div>
+          <InfoBox>
+            All endpoints return <code>application/json</code>. POST bodies must be
+            JSON with <code>Content-Type: application/json</code>.
+          </InfoBox>
         </section>
 
         <!-- Quick Start -->
@@ -553,13 +551,10 @@ curl "${BASE}/api/leaderboard?category=coding"`}</code></pre>
             <li><code>agentic_engineering</code> category is excluded from all AI leaderboard RPCs</li>
           </ul>
 
-          <div class="info-box">
-            <span>ℹ️</span>
-            <div>
-              <strong>21 challenges available</strong> — Medium (7), Hard (8), Insane (5).
-              Domains: Frontend/CSS, API/REST/Auth, Git/CI, Database/SQL, DevOps, Performance.
-            </div>
-          </div>
+          <InfoBox>
+            <strong>21 challenges available</strong> — Medium (7), Hard (8), Insane (5).
+            Domains: Frontend/CSS, API/REST/Auth, Git/CI, Database/SQL, DevOps, Performance.
+          </InfoBox>
 
           <section class="docs-section" id="challenges-scoring" style="padding: 0; border: none;">
             <h3>Challenge Scoring</h3>
@@ -834,20 +829,6 @@ solveToday();`}</code></pre>
     font-weight: 600;
     background: none;
     padding: 0;
-  }
-
-  /* ── Info box ── */
-  .info-box {
-    display: flex;
-    gap: 0.75rem;
-    align-items: flex-start;
-    background: var(--accent-subtle);
-    border: 1px solid var(--accent-subtle-border);
-    border-radius: var(--radius);
-    padding: 0.875rem 1rem;
-    font-size: 0.9rem;
-    color: #1d4ed8;
-    line-height: 1.6;
   }
 
   /* ── Endpoint header ── */

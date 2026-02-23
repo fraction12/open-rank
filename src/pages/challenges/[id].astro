@@ -2,6 +2,7 @@
 export const prerender = false;
 
 import Layout from '../../layouts/Layout.astro';
+import Badge from '../../components/Badge.astro';
 import { getCurrentUser, supabaseAdmin } from '../../lib/supabase';
 
 const { id } = Astro.params;
@@ -93,7 +94,7 @@ const displayData = isTruncated ? inputData.slice(0, INPUT_DISPLAY_LIMIT) : inpu
           <header class="challenge-header">
             <div class="challenge-meta">
               <span class={`badge badge-${puzzle.difficulty}`}>{difficultyLabel[puzzle.difficulty] ?? puzzle.difficulty.toUpperCase()}</span>
-              <span class="badge-category">🛠️ Agentic Engineering</span>
+              <Badge variant="ranked">🛠️ Agentic Engineering</Badge>
               <time class="challenge-date" datetime={puzzle.release_date}>
                 {new Date(puzzle.release_date).toLocaleDateString('en-US', {
                   weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC',
@@ -466,16 +467,6 @@ const displayData = isTruncated ? inputData.slice(0, INPUT_DISPLAY_LIMIT) : inpu
     gap: 0.625rem;
     flex-wrap: wrap;
     margin-bottom: 0.625rem;
-  }
-
-  .badge-category {
-    font-size: 0.8rem;
-    font-weight: 600;
-    padding: 0.2em 0.6em;
-    background: var(--accent-subtle);
-    color: var(--accent);
-    border: 1px solid var(--accent-subtle-border);
-    border-radius: 99px;
   }
 
   .challenge-date {

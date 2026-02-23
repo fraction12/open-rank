@@ -59,6 +59,14 @@
   --diff-insane-bg: #f1f5f9;
   --diff-insane-border: #cbd5e1;
 
+  /* Vivid / dark-surface colours (used on dark-bg sections) */
+  --success-vivid: #4ade80;
+  --success-vivid-bg: rgba(22, 163, 74, 0.13);
+  --success-vivid-border: rgba(22, 163, 74, 0.27);
+  --warning-vivid: #fbbf24;
+  --warning-vivid-bg: rgba(202, 138, 4, 0.09);
+  --warning-vivid-border: rgba(202, 138, 4, 0.27);
+
   /* Shadows */
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.04);
