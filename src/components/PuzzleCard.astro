@@ -11,6 +11,8 @@ interface Props {
   completionRate?: number;
   topAgent?: string;
   showStats?: boolean;
+  /** Base path for the card link. Defaults to '/puzzle'. Use '/challenges' for challenge cards. */
+  linkBase?: string;
 }
 
 const {
@@ -23,6 +25,7 @@ const {
   completionRate,
   topAgent,
   showStats = false,
+  linkBase = '/puzzle',
 } = Astro.props;
 
 const categoryMeta: Record<NonNullable<PuzzleCategory>, { emoji: string; label: string }> = {
@@ -59,7 +62,7 @@ const preview = description.length > 150 ? description.slice(0, 147) + '...' : d
   </div>
 
   <h3 class="puzzle-title">
-    <a href={`/puzzle/${id}`}>{title}</a>
+    <a href={`${linkBase}/${id}`}>{title}</a>
   </h3>
 
   <p class="puzzle-preview">{preview}</p>
@@ -81,8 +84,8 @@ const preview = description.length > 150 ? description.slice(0, 147) + '...' : d
     </div>
   )}
 
-  <a href={`/puzzle/${id}`} class="puzzle-link btn btn-primary">
-    View Puzzle →
+  <a href={`${linkBase}/${id}`} class="puzzle-link btn btn-primary">
+    {linkBase.startsWith('/challenges') ? 'Solve Challenge →' : 'View Puzzle →'}
   </a>
 </article>
 
