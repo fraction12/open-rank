@@ -6,72 +6,33 @@ import { getCurrentUser, supabase } from '../../lib/supabase';
 
 const { id } = Astro.params;
 
-// ── Fetch puzzle (agentic_engineering only) ───────────────────────────────────
-let puzzle: {
-  id: string;
-  title: string;
-  description: string;
-  difficulty: string;
-  category: string;
-  input_data: string | null;
-  release_date: string;
-} | null = null;
+if (!id || !supabase) return Astro.redirect('/challenges');
 
-if (supabase && id) {
-  const { data } = await supabase
-    .from('puzzles')
-    .select('id, title, description, difficulty, category, input_data, release_date')
-    .eq('id', id)
-    .eq('category', 'agentic_engineering')
-    .single();
-  puzzle = data ?? null;
-}
+const today = new Date().toISOString().split('T')[0];
 
-// If not found → redirect
-if (!puzzle) {
-  return Astro.redirect('/challenges');
-}
+const { data: puzzle } = await supabase
+  .from('puzzles')
+  .select('id, title, description, difficulty, category, input_data, release_date')
+  .eq('id', id)
+  .eq('category', 'agentic_engineering')
+  .single();
 
-// If not yet released → redirect
-const todayStr = new Date().toISOString().split('T')[0];
-if (puzzle.release_date > todayStr) {
-  return Astro.redirect('/challenges');
-}
+if (!puzzle || puzzle.release_date > today) return Astro.redirect('/challenges');
 
-// ── Auth ──────────────────────────────────────────────────────────────────────
 const currentUser = await getCurrentUser(Astro.cookies);
 
-// ── Top 5 human submissions ───────────────────────────────────────────────────
-let topHumans: Array<{
-  github_login: string;
-  ai_tool: string | null;
-  time_ms: number | null;
-  score: number;
-}> = [];
-
-if (supabase) {
-  const { data } = await supabase.rpc('leaderboard_humans_by_puzzle', {
-    p_puzzle_id: id,
-    p_limit: 5,
-  });
-  topHumans = data ?? [];
-}
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-const formattedDate = new Date(puzzle.release_date).toLocaleDateString('en-US', {
-  weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
-  timeZone: 'UTC',
+const { data: topHumans } = await supabase.rpc('leaderboard_humans_by_puzzle', {
+  p_puzzle_id: id,
+  p_limit: 5,
 });
 
-// ── Markdown renderer ─────────────────────────────────────────────────────────
+// ── Markdown renderer ────────────────────────────────────────────────────────
 function renderMarkdown(text: string): string {
   const escape = (s: string) =>
     s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-
   const lines = text.split('\n');
   const out: string[] = [];
   let i = 0;
-
   while (i < lines.length) {
     if (lines[i].trim().startsWith('```')) {
       const lang = lines[i].trim().slice(3).trim();
@@ -85,219 +46,166 @@ function renderMarkdown(text: string): string {
       out.push(`<pre><code class="language-${lang}">${codeLines.join('\n')}</code></pre>`);
       continue;
     }
-
     const line = lines[i];
-    if (!line.trim()) {
-      out.push('<br />');
-      i++;
-      continue;
-    }
-
-    const rendered = escape(line)
-      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-      .replace(/`([^`]+)`/g, '<code>$1</code>');
-    out.push(`<p>${rendered}</p>`);
+    if (!line.trim()) { out.push('<br/>'); i++; continue; }
+    let processed = escape(line);
+    processed = processed.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    processed = processed.replace(/\*(.+?)\*/g, '<em>$1</em>');
+    processed = processed.replace(/`(.+?)`/g, '<code>$1</code>');
+    out.push(`<p>${processed}</p>`);
     i++;
   }
-
-  return out.join('');
+  return out.join('\n');
 }
 
-const isDownloadInput = puzzle.input_data?.startsWith('/') ?? false;
-const inputPreview = puzzle.input_data
-  ? (puzzle.input_data.slice(0, 2000) + (puzzle.input_data.length > 2000 ? '\n...(truncated)' : ''))
-  : '';
+const difficultyLabel: Record<string, string> = {
+  easy: 'EASY', medium: 'MEDIUM', hard: 'HARD', insane: 'INSANE',
+};
 ---
 
-<Layout title={puzzle.title} description={puzzle.description.slice(0, 160)}>
-  <!-- Inline puzzleId for the client script -->
-  <script define:vars={{ puzzleId: puzzle.id }} is:inline>
-    window.__challengePuzzleId = puzzleId;
-  </script>
-
-  <div class="challenge-page">
+<Layout
+  title={`${puzzle.title} | OpenRank Challenges`}
+  description={`Human challenge: ${puzzle.title}. Use your AI tools to solve this engineering problem.`}
+>
+  <div class="challenge-detail-page">
     <div class="container">
 
-      <!-- ── Breadcrumb ── -->
-      <div class="breadcrumb">
-        <a href="/challenges" class="breadcrumb-link">← Challenges</a>
-      </div>
+      <a href="/challenges" class="breadcrumb-link">← Challenges</a>
 
-      <!-- ── Main grid ── -->
       <div class="challenge-grid">
 
-        <!-- ══════════════ LEFT COLUMN ══════════════ -->
+        <!-- ── Left: Main content ── -->
         <main class="challenge-main">
 
           <!-- Header -->
           <header class="challenge-header">
-            <div class="puzzle-meta">
-              <span class={`badge badge-${puzzle.difficulty}`}>{puzzle.difficulty}</span>
+            <div class="challenge-meta">
+              <span class={`badge badge-${puzzle.difficulty}`}>{difficultyLabel[puzzle.difficulty] ?? puzzle.difficulty.toUpperCase()}</span>
               <span class="badge-category">🛠️ Agentic Engineering</span>
-              <time class="puzzle-date" datetime={puzzle.release_date}>{formattedDate}</time>
+              <time class="challenge-date" datetime={puzzle.release_date}>
+                {new Date(puzzle.release_date).toLocaleDateString('en-US', {
+                  weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC',
+                })}
+              </time>
             </div>
-            <h1 class="puzzle-title">{puzzle.title}</h1>
+            <h1 class="challenge-title">{puzzle.title}</h1>
           </header>
 
           <!-- Description -->
-          <section class="card">
+          <section class="challenge-description card">
             <h2 class="section-heading">Description</h2>
             <div class="prose" set:html={renderMarkdown(puzzle.description)} />
           </section>
 
           <!-- Input Data -->
-          {isDownloadInput ? (
-            <section class="challenge-input card">
-              <div class="input-header">
-                <h2 class="section-heading">Input Data</h2>
-                <a href={puzzle.input_data!} download class="btn btn-secondary btn-sm">⬇ Download</a>
-              </div>
-              <p class="input-note">
-                This challenge uses a large input file. Download it at:
-                <code>{puzzle.input_data}</code>
-              </p>
-            </section>
-          ) : (
-            <section class="challenge-input card">
-              <div class="input-header">
-                <h2 class="section-heading">Input Data</h2>
-                <button class="btn btn-secondary btn-sm" id="copy-input-btn">Copy</button>
-              </div>
-              <pre class="input-data-pre"><code id="input-data-text">{inputPreview}</code></pre>
-            </section>
-          )}
+          <section class="challenge-input card">
+            <div class="input-header">
+              <h2 class="section-heading">Input Data</h2>
+              <button class="btn btn-secondary btn-sm" id="copy-input-btn">Copy</button>
+            </div>
+            <pre class="input-data-pre"><code id="input-data-text">{(puzzle.input_data ?? '').slice(0, 3000)}{(puzzle.input_data?.length ?? 0) > 3000 ? '\n...(truncated)' : ''}</code></pre>
+          </section>
 
-          <!-- ── Solve Section ── -->
-          {currentUser ? (
-            <section class="challenge-solve card" id="challenge-solve">
-              <h2 class="section-heading">Solve This Challenge</h2>
+          <!-- Solve Section -->
+          <section class="challenge-solve card" id="challenge-solve">
+            <h2 class="section-heading">Solve This Challenge</h2>
 
-              <!-- State 1: Not started -->
-              <div id="solve-start">
-                <p class="section-sub">Use any AI tool to find the answer. Timer starts when you click Start.</p>
-                <div class="scoring-summary">
-                  <span class="score-pill-sm">✅ 50pts correctness</span>
-                  <span class="score-pill-sm">⚡ up to 30pts speed</span>
-                  <span class="score-pill-sm">🎯 +20pts first attempt</span>
-                </div>
-                <button class="btn btn-primary btn-lg" id="start-btn">Start Challenge</button>
-              </div>
-
-              <!-- State 2: In progress -->
-              <div id="solve-active" style="display:none">
-                <div class="timer-display" id="timer-display">0:00</div>
-                <p class="timer-sub">Timer running — submit when ready</p>
-
-                <div class="form-group">
-                  <label class="form-label" for="ai_tool">AI Tool Used</label>
-                  <select id="ai_tool" class="form-input form-select">
-                    <option value="">Select your tool...</option>
-                    <option value="claude">Claude (Anthropic)</option>
-                    <option value="gpt-4o">GPT-4o (OpenAI)</option>
-                    <option value="gemini">Gemini (Google)</option>
-                    <option value="cursor">Cursor</option>
-                    <option value="copilot">GitHub Copilot</option>
-                    <option value="grok">Grok (xAI)</option>
-                    <option value="other">Other</option>
-                  </select>
+            {currentUser ? (
+              <div id="solve-container">
+                <!-- State 1: Not started -->
+                <div id="solve-start">
+                  <p class="section-sub">Use any AI tool to find the answer. Timer starts when you click Start.</p>
+                  <div class="scoring-pills">
+                    <span class="score-pill-sm">✅ 50pts correctness</span>
+                    <span class="score-pill-sm">⚡ up to 30pts speed</span>
+                    <span class="score-pill-sm">🎯 +20pts first attempt</span>
+                  </div>
+                  <button class="btn btn-primary btn-lg" id="start-btn">▶ Start Challenge</button>
                 </div>
 
-                <div class="form-group">
-                  <label class="form-label" for="challenge-answer">Your Answer</label>
-                  <input
-                    type="text"
-                    id="challenge-answer"
-                    class="form-input"
-                    placeholder="Type your answer..."
-                    autocomplete="off"
-                  />
-                  <p class="form-hint">
-                    Attempt <span id="attempt-count">1</span>
-                    · <span id="efficiency-hint">First attempt = +20pts efficiency bonus</span>
-                  </p>
+                <!-- State 2: In progress -->
+                <div id="solve-active" style="display:none">
+                  <div class="timer-display" id="timer-display">0:00</div>
+                  <p class="timer-sub">Timer running — submit when ready</p>
+
+                  <div class="form-group">
+                    <label class="form-label" for="ai_tool">AI Tool Used</label>
+                    <select id="ai_tool" class="form-input">
+                      <option value="">Select your tool...</option>
+                      <option value="claude">Claude (Anthropic)</option>
+                      <option value="gpt-4o">GPT-4o (OpenAI)</option>
+                      <option value="gemini">Gemini (Google)</option>
+                      <option value="cursor">Cursor</option>
+                      <option value="copilot">GitHub Copilot</option>
+                      <option value="grok">Grok (xAI)</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
+
+                  <div class="form-group">
+                    <label class="form-label" for="challenge-answer">Your Answer</label>
+                    <input type="text" id="challenge-answer" class="form-input"
+                      placeholder="Type your answer..." autocomplete="off" />
+                    <p class="form-hint">
+                      Attempt <span id="attempt-count">1</span> ·
+                      <span id="efficiency-hint">First attempt = +20pts efficiency bonus</span>
+                    </p>
+                  </div>
+
+                  <button class="btn btn-primary" id="submit-btn">Submit Answer</button>
+                  <div id="challenge-result" class="submit-result" aria-live="polite"></div>
                 </div>
 
-                <button class="btn btn-primary" id="submit-btn">Submit Answer</button>
-                <div id="challenge-result" class="submit-result" aria-live="polite"></div>
-              </div>
-
-              <!-- State 3: Solved -->
-              <div id="solve-done" style="display:none" class="solve-success">
-                <div class="success-badge">✅ Challenge Complete</div>
-                <div class="solved-with" id="solved-with"></div>
-                <div class="score-breakdown" id="score-breakdown"></div>
-              </div>
-            </section>
-          ) : (
-            <section class="challenge-solve card">
-              <h2 class="section-heading">Solve This Challenge</h2>
-              <div class="callout callout-muted">
-                <a href="/api/auth/signin">Sign in with GitHub →</a> to compete on the human leaderboard.
-              </div>
-              <p class="form-hint">Practice mode: you can still try the challenge but won't appear on the leaderboard.</p>
-
-              <div style="margin-top: 1.25rem;">
-                <div class="form-group">
-                  <label class="form-label" for="ai_tool_guest">AI Tool Used</label>
-                  <select id="ai_tool_guest" class="form-input form-select">
-                    <option value="">Select your tool...</option>
-                    <option value="claude">Claude (Anthropic)</option>
-                    <option value="gpt-4o">GPT-4o (OpenAI)</option>
-                    <option value="gemini">Gemini (Google)</option>
-                    <option value="cursor">Cursor</option>
-                    <option value="copilot">GitHub Copilot</option>
-                    <option value="grok">Grok (xAI)</option>
-                    <option value="other">Other</option>
-                  </select>
+                <!-- State 3: Solved -->
+                <div id="solve-done" style="display:none" class="solve-success">
+                  <div class="success-badge">✅ Challenge Complete</div>
+                  <div class="solved-with" id="solved-with"></div>
+                  <div class="score-breakdown" id="score-breakdown"></div>
+                  <a href="/leaderboard?tab=humans" class="btn btn-secondary" style="margin-top:1rem">View Leaderboard →</a>
                 </div>
-                <div class="form-group">
-                  <label class="form-label" for="challenge-answer-guest">Your Answer</label>
-                  <input
-                    type="text"
-                    id="challenge-answer-guest"
-                    class="form-input"
-                    placeholder="Type your answer..."
-                    autocomplete="off"
-                  />
-                </div>
-                <button class="btn btn-secondary" id="guest-submit-btn">Try Answer (Practice)</button>
-                <div id="guest-result" class="submit-result" aria-live="polite"></div>
               </div>
-            </section>
-          )}
+            ) : (
+              <div>
+                <div class="callout callout-muted">
+                  <a href="/api/auth/signin">Sign in with GitHub →</a> to compete on the human leaderboard.
+                </div>
+                <p class="form-hint" style="margin-top:0.75rem">Your score will appear alongside other humans using AI tools.</p>
+              </div>
+            )}
+          </section>
 
         </main>
 
-        <!-- ══════════════ RIGHT SIDEBAR ══════════════ -->
+        <!-- ── Right: Sidebar ── -->
         <aside class="challenge-sidebar">
 
           <!-- Top Humans -->
           <div class="sidebar-card card">
             <h3 class="sidebar-heading">🏅 Top Humans</h3>
             <p class="sidebar-sub">Fastest correct solutions</p>
-
-            {topHumans.length === 0 ? (
+            {!topHumans || topHumans.length === 0 ? (
               <div class="empty-leaderboard">
                 <span class="empty-trophy">🏆</span>
-                <p>No entries yet.<br />Be the first!</p>
+                <p>No entries yet.<br/>Be the first!</p>
               </div>
             ) : (
               <div class="human-entries">
-                {topHumans.slice(0, 5).map((entry, i) => (
+                {topHumans.slice(0, 5).map((entry: any, i: number) => (
                   <div class="human-entry">
                     <span class="entry-rank">
                       {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i + 1}`}
                     </span>
-                    <a href={`/profile/${entry.github_login}`} class="entry-login">@{entry.github_login}</a>
+                    <a href={`/profile/${entry.github_login}`} class="entry-login">
+                      @{entry.github_login}
+                    </a>
                     <span class="entry-tool">{entry.ai_tool ?? '—'}</span>
-                    <span class="entry-time">
+                    <span class="entry-time mono-sm">
                       {entry.time_ms ? `${(entry.time_ms / 1000).toFixed(1)}s` : '—'}
                     </span>
                   </div>
                 ))}
               </div>
             )}
-
             <a href="/leaderboard?tab=humans" class="sidebar-more">View full leaderboard →</a>
           </div>
 
@@ -305,11 +213,11 @@ const inputPreview = puzzle.input_data
           <div class="sidebar-card card">
             <h3 class="sidebar-heading">Scoring</h3>
             <ul class="scoring-list">
-              <li><span class="dot dot-green"></span> Correctness <span class="score-max">50pts</span></li>
-              <li><span class="dot dot-blue"></span> Speed bonus <span class="score-max">up to 30</span></li>
-              <li><span class="dot dot-yellow"></span> 1st attempt <span class="score-max">+20pts</span></li>
-              <li><span class="dot dot-yellow"></span> 2nd attempt <span class="score-max">+10pts</span></li>
-              <li><span class="dot dot-yellow"></span> 3rd attempt <span class="score-max">+5pts</span></li>
+              <li><span class="dot dot-green"></span><span>Correctness</span><span class="score-max">50pts</span></li>
+              <li><span class="dot dot-blue"></span><span>Speed bonus</span><span class="score-max">up to 30</span></li>
+              <li><span class="dot dot-yellow"></span><span>1st attempt</span><span class="score-max">+20pts</span></li>
+              <li><span class="dot dot-yellow dim-dot"></span><span>2nd attempt</span><span class="score-max">+10pts</span></li>
+              <li><span class="dot dot-yellow dim-dot"></span><span>3rd attempt</span><span class="score-max">+5pts</span></li>
             </ul>
           </div>
 
@@ -317,37 +225,50 @@ const inputPreview = puzzle.input_data
           <div class="sidebar-card card">
             <h3 class="sidebar-heading">💡 Tips</h3>
             <ul class="tips-list">
-              <li>Share <strong>all</strong> the context with your AI tool — full snippets, full errors</li>
-              <li>Ask <em>why</em>, not just <em>what</em> — better reasoning leads to better answers</li>
-              <li>Verify before submitting — have your AI explain why the answer is correct</li>
-              <li>First attempt earns maximum efficiency bonus — take your time before clicking Submit</li>
+              <li>Share <strong>all</strong> the context — full code, full error messages</li>
+              <li>Ask <em>why</em> not just <em>what</em> — better reasoning = better answers</li>
+              <li>Verify before submitting — have AI explain <em>why</em> it's correct first</li>
+              <li><strong>First attempt = max bonus</strong> — think before you click Submit</li>
             </ul>
           </div>
 
         </aside>
-
       </div>
     </div>
   </div>
 </Layout>
 
-<script>
-  // ── State ──────────────────────────────────────────────────────────────────
-  const puzzleId: string = (window as any).__challengePuzzleId;
+<script define:vars={{ puzzleId: puzzle.id, isLoggedIn: !!currentUser }}>
+  // ── Copy input data ──────────────────────────────────────────────────────
+  document.getElementById('copy-input-btn')?.addEventListener('click', async () => {
+    const text = document.getElementById('input-data-text')?.textContent ?? '';
+    try {
+      await navigator.clipboard.writeText(text);
+      const btn = document.getElementById('copy-input-btn');
+      if (btn) { btn.textContent = 'Copied!'; setTimeout(() => btn.textContent = 'Copy', 2000); }
+    } catch {}
+  });
 
-  let timerInterval: ReturnType<typeof setInterval> | null = null;
-  let startTimestamp: number | null = null;
-  let sessionId: string | null = null;
+  if (!isLoggedIn) return;
+
+  // ── Timer ────────────────────────────────────────────────────────────────
+  let timerInterval = null;
+  let startTimestamp = null;
+  let sessionId = null;
   let attemptCount = 0;
 
-  function formatTime(ms: number): string {
+  function formatTime(ms) {
     const s = Math.floor(ms / 1000);
     const m = Math.floor(s / 60);
     return `${m}:${String(s % 60).padStart(2, '0')}`;
   }
 
-  // ── Start button ───────────────────────────────────────────────────────────
+  // ── Start ────────────────────────────────────────────────────────────────
   document.getElementById('start-btn')?.addEventListener('click', async () => {
+    const startBtn = document.getElementById('start-btn');
+    startBtn.textContent = 'Starting...';
+    startBtn.disabled = true;
+
     try {
       const res = await fetch('/api/puzzle/start-challenge', {
         method: 'POST',
@@ -355,47 +276,35 @@ const inputPreview = puzzle.input_data
         body: JSON.stringify({ puzzle_id: puzzleId }),
       });
       const data = await res.json();
-      if (!res.ok) {
-        alert(data.error ?? 'Failed to start challenge.');
-        return;
-      }
       sessionId = data.session_id ?? null;
-    } catch {
-      // If start-challenge fails, continue without a session (untracked)
-      sessionId = null;
-    }
+    } catch {}
 
     startTimestamp = Date.now();
     attemptCount = 0;
 
-    const startSection = document.getElementById('solve-start');
-    const activeSection = document.getElementById('solve-active');
-    if (startSection) startSection.style.display = 'none';
-    if (activeSection) activeSection.style.display = 'block';
+    document.getElementById('solve-start').style.display = 'none';
+    document.getElementById('solve-active').style.display = 'block';
 
     timerInterval = setInterval(() => {
-      if (startTimestamp !== null) {
-        document.getElementById('timer-display')!.textContent = formatTime(Date.now() - startTimestamp);
-      }
+      const elapsed = Date.now() - startTimestamp;
+      const el = document.getElementById('timer-display');
+      if (el) el.textContent = formatTime(elapsed);
     }, 100);
   });
 
-  // ── Submit button ──────────────────────────────────────────────────────────
+  // ── Submit ───────────────────────────────────────────────────────────────
   document.getElementById('submit-btn')?.addEventListener('click', async () => {
-    const answerEl = document.getElementById('challenge-answer') as HTMLInputElement | null;
-    const toolEl = document.getElementById('ai_tool') as HTMLSelectElement | null;
-    const resultEl = document.getElementById('challenge-result')!;
-
-    const answer = answerEl?.value.trim() ?? '';
-    const ai_tool = toolEl?.value ?? '';
+    const answer = document.getElementById('challenge-answer')?.value?.trim();
+    const ai_tool = document.getElementById('ai_tool')?.value;
+    const resultEl = document.getElementById('challenge-result');
+    const submitBtn = document.getElementById('submit-btn');
 
     if (!answer) { resultEl.textContent = 'Please enter your answer.'; return; }
     if (!ai_tool) { resultEl.textContent = 'Please select your AI tool.'; return; }
 
-    attemptCount++;
-    const submitBtn = document.getElementById('submit-btn') as HTMLButtonElement;
     submitBtn.textContent = 'Submitting...';
     submitBtn.disabled = true;
+    attemptCount++;
 
     try {
       const res = await fetch('/api/submit', {
@@ -415,117 +324,56 @@ const inputPreview = puzzle.input_data
         if (timerInterval) clearInterval(timerInterval);
         const elapsed = startTimestamp ? Date.now() - startTimestamp : 0;
 
-        const activeSection = document.getElementById('solve-active');
-        const doneSection = document.getElementById('solve-done');
-        if (activeSection) activeSection.style.display = 'none';
-        if (doneSection) doneSection.style.display = 'block';
+        // Get tool display name
+        const toolSelect = document.getElementById('ai_tool');
+        const toolName = toolSelect?.options[toolSelect.selectedIndex]?.text ?? ai_tool;
 
-        const selectedTool = toolEl?.options[toolEl.selectedIndex]?.text ?? ai_tool;
-        const solvedWithEl = document.getElementById('solved-with');
-        if (solvedWithEl) {
-          solvedWithEl.textContent = `Solved with ${selectedTool} in ${formatTime(elapsed)} — Score: ${result.score}/100`;
-        }
+        document.getElementById('solve-active').style.display = 'none';
+        const doneEl = document.getElementById('solve-done');
+        doneEl.style.display = 'block';
+
+        document.getElementById('solved-with').textContent =
+          `Solved with ${toolName} in ${formatTime(elapsed)} — Score: ${result.score}/100`;
 
         const b = result.breakdown ?? {};
-        const breakdownEl = document.getElementById('score-breakdown');
-        if (breakdownEl) {
-          breakdownEl.innerHTML = `
-            <span class="score-pill-sm">✅ ${b.correctness ?? 50}pts</span>
-            <span class="score-pill-sm">⚡ ${b.speed_bonus ?? 0}pts speed</span>
-            <span class="score-pill-sm">🎯 ${b.efficiency_bonus ?? 0}pts efficiency</span>
-          `;
-        }
+        document.getElementById('score-breakdown').innerHTML = [
+          `<span class="score-pill-sm">✅ ${b.correctness ?? 50}pts correctness</span>`,
+          `<span class="score-pill-sm">⚡ ${b.speed_bonus ?? 0}pts speed</span>`,
+          `<span class="score-pill-sm">🎯 ${b.efficiency_bonus ?? 0}pts efficiency</span>`,
+        ].join('');
       } else {
-        const effHints = ['', 'First attempt = +20pts efficiency bonus', '+10pts efficiency bonus', '+5pts efficiency bonus'];
         const nextAttempt = attemptCount + 1;
-        const attemptEl = document.getElementById('attempt-count');
+        document.getElementById('attempt-count').textContent = String(nextAttempt);
+        const hints = ['', '+20pts', '+10pts', '+5pts'];
         const hintEl = document.getElementById('efficiency-hint');
-        if (attemptEl) attemptEl.textContent = String(nextAttempt);
-        if (hintEl) {
-          hintEl.textContent = nextAttempt <= 3
-            ? effHints[Math.min(nextAttempt, 3)]
-            : 'No efficiency bonus remaining';
+        if (nextAttempt <= 3) {
+          hintEl.textContent = `Attempt ${nextAttempt} = ${hints[nextAttempt]} efficiency bonus`;
+        } else {
+          hintEl.textContent = 'No efficiency bonus remaining';
         }
-
-        resultEl.innerHTML = `<span class="result-wrong">❌ Incorrect. Try again.</span>`;
+        resultEl.innerHTML = '❌ Incorrect — try again.';
         submitBtn.textContent = 'Submit Answer';
         submitBtn.disabled = false;
       }
     } catch {
-      resultEl.textContent = 'Submission failed. Try again.';
+      resultEl.textContent = 'Submission failed. Please try again.';
       submitBtn.textContent = 'Submit Answer';
       submitBtn.disabled = false;
-    }
-  });
-
-  // ── Copy input button ─────────────────────────────────────────────────────
-  document.getElementById('copy-input-btn')?.addEventListener('click', async () => {
-    const text = document.getElementById('input-data-text')?.textContent ?? '';
-    try {
-      await navigator.clipboard.writeText(text);
-      const btn = document.getElementById('copy-input-btn')!;
-      btn.textContent = 'Copied!';
-      setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
-    } catch {
-      // clipboard not available
-    }
-  });
-
-  // ── Guest practice submit ─────────────────────────────────────────────────
-  document.getElementById('guest-submit-btn')?.addEventListener('click', async () => {
-    const answerEl = document.getElementById('challenge-answer-guest') as HTMLInputElement | null;
-    const toolEl = document.getElementById('ai_tool_guest') as HTMLSelectElement | null;
-    const resultEl = document.getElementById('guest-result')!;
-
-    const answer = answerEl?.value.trim() ?? '';
-    if (!answer) { resultEl.textContent = 'Please enter your answer.'; return; }
-
-    const guestBtn = document.getElementById('guest-submit-btn') as HTMLButtonElement;
-    guestBtn.textContent = 'Checking...';
-    guestBtn.disabled = true;
-
-    try {
-      const res = await fetch('/api/submit', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          puzzle_id: puzzleId,
-          answer,
-          agent_name: 'guest-practice',
-          ai_tool: toolEl?.value || null,
-          is_human: false,
-        }),
-      });
-      const result = await res.json();
-      if (result.correct) {
-        resultEl.innerHTML = `<span class="result-correct">✅ Correct! <a href="/api/auth/signin">Sign in</a> to record your score.</span>`;
-      } else {
-        resultEl.innerHTML = `<span class="result-wrong">❌ Not quite. Try again.</span>`;
-        guestBtn.textContent = 'Try Answer (Practice)';
-        guestBtn.disabled = false;
-      }
-    } catch {
-      resultEl.textContent = 'Check failed. Try again.';
-      guestBtn.textContent = 'Try Answer (Practice)';
-      guestBtn.disabled = false;
     }
   });
 </script>
 
 <style>
-  .challenge-page {
-    padding: 2.5rem 0 5rem;
-  }
-
-  /* ── Breadcrumb ── */
-  .breadcrumb {
-    margin-bottom: 2rem;
+  .challenge-detail-page {
+    padding: 2rem 0 5rem;
   }
 
   .breadcrumb-link {
-    font-size: 0.9375rem;
+    display: inline-block;
+    font-size: 0.875rem;
     color: var(--dim);
     text-decoration: none;
+    margin-bottom: 1.5rem;
     transition: color 0.15s;
   }
   .breadcrumb-link:hover { color: var(--text); }
@@ -533,12 +381,11 @@ const inputPreview = puzzle.input_data
   /* ── Two-column grid ── */
   .challenge-grid {
     display: grid;
-    grid-template-columns: 1fr 320px;
+    grid-template-columns: 1fr 300px;
     gap: 2rem;
     align-items: start;
   }
 
-  /* ── Left column ── */
   .challenge-main {
     display: flex;
     flex-direction: column;
@@ -547,76 +394,63 @@ const inputPreview = puzzle.input_data
   }
 
   /* ── Header ── */
-  .challenge-header {
-    padding-bottom: 0;
-  }
-
-  .puzzle-meta {
+  .challenge-meta {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
-    margin-bottom: 0.75rem;
+    gap: 0.625rem;
     flex-wrap: wrap;
+    margin-bottom: 0.625rem;
   }
 
   .badge-category {
-    display: inline-flex;
-    align-items: center;
-    background: var(--surface-2, #f1f5f9);
-    color: var(--dim);
-    border: 1px solid var(--border);
+    font-size: 0.8rem;
+    font-weight: 600;
+    padding: 0.2em 0.6em;
+    background: #f0f4ff;
+    color: #3b82f6;
+    border: 1px solid #bfdbfe;
     border-radius: 99px;
-    padding: 0.15em 0.65em;
-    font-size: 0.75rem;
-    font-weight: 500;
-    letter-spacing: 0.01em;
   }
 
-  .puzzle-date {
+  .challenge-date {
     font-size: 0.875rem;
     color: var(--dim);
   }
 
-  .puzzle-title {
+  .challenge-title {
     font-size: 2rem;
     font-weight: 800;
     letter-spacing: -0.02em;
     color: var(--text);
+    margin: 0;
+    line-height: 1.2;
   }
 
-  /* ── Section heading ── */
+  /* ── Cards ── */
   .section-heading {
-    font-size: 0.9375rem;
+    font-size: 0.875rem;
     font-weight: 700;
-    color: var(--text);
-    margin-bottom: 1rem;
-    padding-bottom: 0.625rem;
-    border-bottom: 1px solid var(--border);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--dim);
+    margin: 0 0 1rem;
   }
 
-  /* ── Input card ── */
+  .section-sub {
+    font-size: 0.9375rem;
+    color: var(--dim);
+    margin: -0.5rem 0 1.25rem;
+  }
+
+  /* ── Input data ── */
   .input-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 1rem;
-    padding-bottom: 0.625rem;
-    border-bottom: 1px solid var(--border);
+    margin-bottom: 0.75rem;
   }
 
-  .input-header h2 {
-    margin-bottom: 0;
-    border-bottom: none;
-    padding-bottom: 0;
-  }
-
-  .btn-sm { font-size: 0.8125rem; padding: 0.375rem 0.75rem; }
-
-  .input-note {
-    font-size: 0.9375rem;
-    color: var(--dim);
-    margin-bottom: 0.5rem;
-  }
+  .input-header .section-heading { margin: 0; }
 
   .input-data-pre {
     max-height: 320px;
@@ -624,71 +458,89 @@ const inputPreview = puzzle.input_data
     overflow-y: auto;
   }
 
-  /* ── Solve card ── */
-  .challenge-solve {
-    border: 1px solid #3b82f620;
-    background: #3b82f606;
-  }
-
-  .section-sub {
-    font-size: 0.9rem;
-    color: var(--dim);
-    margin-top: -0.5rem;
-    margin-bottom: 1.25rem;
-  }
-
-  .scoring-summary {
+  /* ── Scoring pills ── */
+  .scoring-pills {
     display: flex;
-    gap: 0.5rem;
     flex-wrap: wrap;
+    gap: 0.5rem;
     margin-bottom: 1.5rem;
+  }
+
+  .score-pill-sm {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    background: var(--surface, #f8f9fa);
+    border: 1px solid var(--border);
+    border-radius: 99px;
+    font-size: 0.8125rem;
+    color: var(--text);
   }
 
   /* ── Timer ── */
   .timer-display {
-    font-size: 3rem;
+    font-size: 3.5rem;
     font-weight: 800;
     font-variant-numeric: tabular-nums;
-    letter-spacing: -0.02em;
-    color: var(--accent);
-    margin: 1rem 0 0.25rem;
+    letter-spacing: -0.03em;
+    color: var(--accent, #3b82f6);
+    line-height: 1;
+    margin: 0.5rem 0 0.25rem;
   }
 
   .timer-sub {
     font-size: 0.875rem;
     color: var(--dim);
-    margin-bottom: 1.5rem;
+    margin: 0 0 1.5rem;
   }
 
   /* ── Form ── */
   .form-group {
     display: flex;
     flex-direction: column;
-    gap: 0.4rem;
+    gap: 0.375rem;
     margin-bottom: 1rem;
   }
 
-  .form-select {
-    appearance: none;
-    cursor: pointer;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23888' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: right 0.75rem center;
-    padding-right: 2.25rem;
+  .form-label {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .form-input {
+    padding: 0.625rem 0.875rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius, 8px);
+    background: var(--bg);
+    color: var(--text);
+    font-size: 0.9375rem;
+    font-family: inherit;
+    transition: border-color 0.15s;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .form-input:focus {
+    outline: none;
+    border-color: var(--accent, #3b82f6);
+    box-shadow: 0 0 0 3px rgba(59,130,246,0.15);
+  }
+
+  .form-hint {
+    font-size: 0.8125rem;
+    color: var(--dim);
+    margin: 0;
   }
 
   .submit-result {
     margin-top: 0.75rem;
     font-size: 0.9375rem;
+    min-height: 1.5rem;
   }
 
-  .result-wrong { color: #ef4444; }
-  .result-correct { color: #16a34a; }
-
-  /* ── Solve success ── */
+  /* ── Solved state ── */
   .solve-success {
     text-align: center;
-    padding: 1.5rem 1rem;
+    padding: 1.5rem 0.5rem;
   }
 
   .success-badge {
@@ -699,51 +551,25 @@ const inputPreview = puzzle.input_data
   }
 
   .solved-with {
-    font-size: 1rem;
+    font-size: 1.0625rem;
     font-weight: 600;
-    margin-bottom: 1rem;
     color: var(--text);
+    margin-bottom: 1rem;
   }
 
   .score-breakdown {
     display: flex;
-    gap: 0.25rem;
+    gap: 0.5rem;
     flex-wrap: wrap;
     justify-content: center;
   }
 
-  /* ── Score pills ── */
-  .score-pill-sm {
-    display: inline-block;
-    padding: 0.25rem 0.625rem;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 99px;
-    font-size: 0.8125rem;
-    margin: 0.125rem;
+  /* ── Start button ── */
+  .btn-lg {
+    padding: 0.875rem 2rem;
+    font-size: 1rem;
+    margin-top: 0.5rem;
   }
-
-  /* ── Callout ── */
-  .callout {
-    border-radius: 8px;
-    padding: 0.75rem 1rem;
-    font-size: 0.875rem;
-    margin-bottom: 1rem;
-    border: 1px solid transparent;
-  }
-
-  .callout a {
-    font-weight: 600;
-    text-decoration: underline;
-  }
-
-  .callout-muted {
-    background: var(--surface-2, #1e1e1e);
-    border-color: var(--border);
-    color: var(--dim);
-  }
-
-  .callout-muted a { color: var(--text); }
 
   /* ── Sidebar ── */
   .challenge-sidebar {
@@ -751,101 +577,98 @@ const inputPreview = puzzle.input_data
     flex-direction: column;
     gap: 1.25rem;
     position: sticky;
-    top: calc(var(--nav-height, 64px) + 1.5rem);
+    top: 5rem;
   }
 
   .sidebar-card { padding: 1.25rem; }
 
   .sidebar-heading {
-    font-size: 0.9375rem;
+    font-size: 0.875rem;
     font-weight: 700;
-    color: var(--text);
-    margin-bottom: 0.25rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--dim);
+    margin: 0 0 0.5rem;
   }
 
   .sidebar-sub {
     font-size: 0.8125rem;
     color: var(--dim);
-    margin-bottom: 1rem;
+    margin: 0 0 1rem;
   }
 
   .sidebar-more {
     display: block;
-    text-align: center;
-    margin-top: 1rem;
-    font-size: 0.875rem;
-    color: var(--accent);
+    font-size: 0.8125rem;
+    color: var(--accent, #3b82f6);
     text-decoration: none;
-    transition: opacity 0.15s;
-  }
-  .sidebar-more:hover { opacity: 0.8; }
-
-  /* ── Human entries leaderboard ── */
-  .empty-leaderboard {
+    margin-top: 1rem;
     text-align: center;
-    padding: 1.25rem 0;
-    color: var(--dim);
-    font-size: 0.875rem;
   }
+  .sidebar-more:hover { text-decoration: underline; }
 
-  .empty-trophy {
-    font-size: 2rem;
-    display: block;
-    margin-bottom: 0.5rem;
-  }
-
+  /* ── Human entries ── */
   .human-entries {
     display: flex;
     flex-direction: column;
     gap: 0.625rem;
-    margin-bottom: 0.25rem;
   }
 
   .human-entry {
     display: grid;
-    grid-template-columns: 1.75rem 1fr auto auto;
+    grid-template-columns: 1.5rem 1fr auto auto;
     align-items: center;
-    gap: 0.375rem;
-    font-size: 0.8125rem;
+    gap: 0.5rem;
+    font-size: 0.875rem;
   }
 
-  .entry-rank {
-    font-size: 0.9375rem;
-    text-align: center;
-  }
+  .entry-rank { text-align: center; font-size: 0.9rem; }
 
   .entry-login {
-    color: var(--accent);
+    color: var(--accent, #3b82f6);
     text-decoration: none;
-    font-weight: 500;
-    white-space: nowrap;
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
     overflow: hidden;
     text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .entry-login:hover { text-decoration: underline; }
 
   .entry-tool {
     font-size: 0.75rem;
     color: var(--dim);
+    background: var(--surface);
+    padding: 0.1em 0.45em;
+    border-radius: 4px;
+    border: 1px solid var(--border);
     white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 60px;
   }
 
-  .entry-time {
-    font-size: 0.75rem;
+  .mono-sm {
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
     color: var(--dim);
     white-space: nowrap;
-    font-variant-numeric: tabular-nums;
   }
+
+  .empty-leaderboard {
+    text-align: center;
+    padding: 1.5rem 0;
+    color: var(--dim);
+    font-size: 0.875rem;
+  }
+
+  .empty-trophy { font-size: 2rem; display: block; margin-bottom: 0.5rem; }
 
   /* ── Scoring list ── */
   .scoring-list {
     list-style: none;
+    padding: 0;
+    margin: 0.5rem 0 0;
     display: flex;
     flex-direction: column;
-    gap: 0.6rem;
+    gap: 0.5rem;
   }
 
   .scoring-list li {
@@ -856,11 +679,12 @@ const inputPreview = puzzle.input_data
     color: var(--dim);
   }
 
+  .scoring-list li span:nth-child(2) { flex: 1; }
+
   .score-max {
-    margin-left: auto;
-    color: var(--text);
     font-weight: 600;
-    font-size: 0.8125rem;
+    color: var(--text);
+    white-space: nowrap;
   }
 
   .dot {
@@ -869,24 +693,25 @@ const inputPreview = puzzle.input_data
     border-radius: 50%;
     flex-shrink: 0;
   }
+  .dot-green  { background: #22c55e; }
+  .dot-blue   { background: #3b82f6; }
+  .dot-yellow { background: #eab308; }
+  .dim-dot    { opacity: 0.5; }
 
-  .dot-green  { background: var(--success, #16a34a); }
-  .dot-blue   { background: var(--accent); }
-  .dot-yellow { background: #f59e0b; }
-
-  /* ── Tips list ── */
+  /* ── Tips ── */
   .tips-list {
     list-style: none;
+    padding: 0;
+    margin: 0.5rem 0 0;
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
-    padding: 0;
+    gap: 0.625rem;
   }
 
   .tips-list li {
     font-size: 0.875rem;
     color: var(--dim);
-    line-height: 1.55;
+    line-height: 1.5;
     padding-left: 1rem;
     position: relative;
   }
@@ -895,8 +720,22 @@ const inputPreview = puzzle.input_data
     content: '→';
     position: absolute;
     left: 0;
-    color: var(--accent);
-    font-weight: 600;
+    color: var(--accent, #3b82f6);
+    font-size: 0.75rem;
+    top: 0.1em;
+  }
+
+  .tips-list strong { color: var(--text); }
+  .tips-list em { color: var(--text); font-style: italic; }
+
+  /* ── Callout ── */
+  .callout-muted {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius, 8px);
+    padding: 0.875rem 1rem;
+    font-size: 0.9375rem;
+    color: var(--dim);
   }
 
   /* ── Responsive ── */
@@ -904,14 +743,11 @@ const inputPreview = puzzle.input_data
     .challenge-grid {
       grid-template-columns: 1fr;
     }
-
     .challenge-sidebar {
       position: static;
     }
-  }
-
-  @media (max-width: 600px) {
-    .puzzle-title { font-size: 1.5rem; }
-    .timer-display { font-size: 2.25rem; }
+    .challenge-title {
+      font-size: 1.5rem;
+    }
   }
 </style>
