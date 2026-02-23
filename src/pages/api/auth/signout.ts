@@ -4,6 +4,7 @@ import { AUTH_COOKIE_NAME } from '../../../lib/supabase';
 import { corsHeaders } from '../../../lib/cors';
 import { jsonError } from '../../../lib/response';
 import { verifyCsrfHeaderOrForm } from '../../../lib/csrf';
+import { getEnv, missingRequiredEnv } from '../../../lib/env';
 
 export const POST: APIRoute = async ({ request, cookies, redirect }) => {
   const cors = corsHeaders(request);
@@ -11,8 +12,13 @@ export const POST: APIRoute = async ({ request, cookies, redirect }) => {
     return jsonError('Invalid CSRF token', 403, 'CSRF_INVALID', cors);
   }
 
-  const supabaseUrl = (typeof process !== 'undefined' ? process.env['SUPABASE_URL'] : undefined) || import.meta.env.SUPABASE_URL as string;
-  const supabaseAnonKey = (typeof process !== 'undefined' ? process.env['SUPABASE_ANON_KEY'] : undefined) || import.meta.env.SUPABASE_ANON_KEY as string;
+  const missing = missingRequiredEnv();
+  if (missing.length > 0) {
+    return jsonError('Auth provider is not configured', 503, 'AUTH_NOT_CONFIGURED', cors);
+  }
+
+  const supabaseUrl = getEnv('SUPABASE_URL') as string;
+  const supabaseAnonKey = getEnv('SUPABASE_ANON_KEY') as string;
 
   const cookieNames = [
     AUTH_COOKIE_NAME,

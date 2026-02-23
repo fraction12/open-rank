@@ -203,6 +203,9 @@ npm run build
 # Typecheck
 npm run typecheck
 
+# Full pre-demo gate (typecheck + tests + build)
+npm run preflight
+
 # Smoke test a deployed environment
 SMOKE_BASE_URL=https://open-rank.com npm run smoke
 ```
@@ -215,6 +218,11 @@ SMOKE_BASE_URL=https://open-rank.com npm run smoke
 | `SUPABASE_ANON_KEY` | Supabase anonymous (public) key |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key (server-only, required for write/admin operations) |
 | `ANSWER_SALT` | Secret salt for answer hashing (never commit this) |
+
+### Ops Endpoints
+
+- `GET /api/health`: liveness endpoint (always `200` when process is up)
+- `GET /api/ready`: readiness endpoint (`200` only if env + DB are available)
 
 ---
 

@@ -2,6 +2,7 @@ import type { APIRoute } from 'astro';
 import { createServerClient } from '@supabase/ssr';
 import { checkRateLimit } from '../../../lib/rate-limit';
 import { jsonError } from '../../../lib/response';
+import { getEnv, missingRequiredEnv } from '../../../lib/env';
 
 export const GET: APIRoute = async ({ cookies, redirect, request }) => {
   // Rate limit: 10 sign-in attempts per IP per minute
@@ -13,8 +14,13 @@ export const GET: APIRoute = async ({ cookies, redirect, request }) => {
   if (!rl.allowed) {
     return jsonError('Too many requests', 429, 'RATE_LIMITED');
   }
-  const supabaseUrl = (typeof process !== 'undefined' ? process.env['SUPABASE_URL'] : undefined) || import.meta.env.SUPABASE_URL as string;
-  const supabaseAnonKey = (typeof process !== 'undefined' ? process.env['SUPABASE_ANON_KEY'] : undefined) || import.meta.env.SUPABASE_ANON_KEY as string;
+  const missing = missingRequiredEnv();
+  if (missing.length > 0) {
+    return jsonError('Auth provider is not configured', 503, 'AUTH_NOT_CONFIGURED');
+  }
+
+  const supabaseUrl = getEnv('SUPABASE_URL') as string;
+  const supabaseAnonKey = getEnv('SUPABASE_ANON_KEY') as string;
 
   const requestOrigin = new URL(request.url).origin;
   const secureCookies = requestOrigin.startsWith('https://');

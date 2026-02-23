@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit -p tsconfig.ci.json",
     "test": "vitest run",
     "test:watch": "vitest",
-    "smoke": "node scripts/smoke-test.mjs"
+    "smoke": "node scripts/smoke-test.mjs",
+    "preflight": "node scripts/demo-preflight.mjs"
   },
   "dependencies": {
     "@astrojs/vercel": "^9.0.4",

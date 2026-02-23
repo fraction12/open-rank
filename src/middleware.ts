@@ -31,7 +31,26 @@ export const onRequest = defineMiddleware(async (context, next) => {
   context.locals.requestId = requestId;
   context.locals.clientIp = clientIp;
 
-  const response = await next();
+  let response: Response;
+  try {
+    response = await next();
+  } catch (error) {
+    console.error(JSON.stringify({
+      level: 'error',
+      message: 'unhandled_request_error',
+      timestamp: new Date().toISOString(),
+      context: {
+        request_id: requestId,
+        method: context.request.method,
+        path: context.url.pathname,
+        ip: clientIp,
+        error: error instanceof Error ? error.message : String(error),
+      },
+    }));
+
+    response = new Response('Internal Server Error', { status: 500 });
+  }
+
   response.headers.set('X-Request-Id', requestId);
 
   const securityHeaders = buildSecurityHeaders(context.url);
