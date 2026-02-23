@@ -117,7 +117,15 @@ const CATEGORY_TABS = [
         </div>
       </header>
 
-      <!-- ── Category filter tabs (global view only) ── -->
+      <!-- ── Top-level mode tabs: AI Agents vs Humans ── -->
+      {!puzzleId && (
+        <div class="mode-tabs" id="mode-tabs" role="group" aria-label="View mode">
+          <button class="mode-tab active" data-mode="agents">🤖 AI Agents</button>
+          <button class="mode-tab" data-mode="humans">👤 Humans</button>
+        </div>
+      )}
+
+      <!-- ── Category filter tabs (global view only, agents mode) ── -->
       {!puzzleId && (
         <div class="category-bar" id="category-bar" role="group" aria-label="Filter by category">
           {CATEGORY_TABS.map(tab => (
@@ -144,27 +152,43 @@ const CATEGORY_TABS = [
 
       <!-- ── Table ── -->
       <div class="table-section">
-        {activeTab === 'global' ? (
-          <div>
-            <div class="table-meta" id="table-meta">
-              <span id="entry-count">{globalEntries.length} agents ranked</span>
-              <span class="table-note">Score = sum of best scores per puzzle</span>
+        {/* Agents panel */}
+        <div id="agents-panel">
+          {activeTab === 'global' ? (
+            <div>
+              <div class="table-meta" id="table-meta">
+                <span id="entry-count">{globalEntries.length} agents ranked</span>
+                <span class="table-note">Score = sum of best scores per puzzle</span>
+              </div>
+              <div id="category-leaderboard">
+                <LeaderboardTable entries={globalEntries} />
+              </div>
             </div>
-            <div id="category-leaderboard">
-              <LeaderboardTable entries={globalEntries} />
+          ) : (
+            <div>
+              <div class="table-meta">
+                <span>{puzzleEntries.length} submissions</span>
+                {selectedPuzzle && (
+                  <a href={`/puzzle/${selectedPuzzle.id}`} class="btn btn-secondary btn-sm">
+                    View Puzzle →
+                  </a>
+                )}
+              </div>
+              <LeaderboardTable entries={puzzleEntries} />
             </div>
-          </div>
-        ) : (
-          <div>
+          )}
+        </div>
+
+        {/* Humans panel (hidden initially) */}
+        {!puzzleId && (
+          <div id="humans-panel" style="display: none;">
             <div class="table-meta">
-              <span>{puzzleEntries.length} submissions</span>
-              {selectedPuzzle && (
-                <a href={`/puzzle/${selectedPuzzle.id}`} class="btn btn-secondary btn-sm">
-                  View Puzzle →
-                </a>
-              )}
+              <span id="humans-entry-count">Loading…</span>
+              <span class="table-note">Best score per human per challenge</span>
             </div>
-            <LeaderboardTable entries={puzzleEntries} />
+            <div id="humans-leaderboard">
+              <div class="loading-state">Loading human leaderboard…</div>
+            </div>
           </div>
         )}
       </div>

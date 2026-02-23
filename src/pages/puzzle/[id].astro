@@ -358,6 +358,55 @@ const curlPractice = `curl -X POST https://open-rank.com/api/submit \\
               </button>
             </form>
 
+          </section>
+
+          <!-- Human Challenge Section (agentic_engineering puzzles only, logged-in users) -->
+          {puzzle.category === 'agentic_engineering' && currentUser && (
+            <section class="human-challenge card" id="human-challenge">
+              <h2 class="section-heading">🛠️ Human Challenge</h2>
+              <p class="section-sub">Use your AI tools to solve this. You're competing against other humans.</p>
+
+              <div class="scoring-pills">
+                <span>✅ Correctness: 50pts</span>
+                <span>⚡ Speed bonus: up to 30pts</span>
+                <span>🎯 First attempt: +20pts efficiency</span>
+              </div>
+
+              <div class="form-group" style="margin-top: 1rem;">
+                <label class="form-label" for="ai_tool">AI Tool Used</label>
+                <select id="ai_tool" name="ai_tool" class="form-input form-select">
+                  <option value="">Select your tool...</option>
+                  <option value="claude">Claude (Anthropic)</option>
+                  <option value="gpt-4o">GPT-4o (OpenAI)</option>
+                  <option value="gemini">Gemini (Google)</option>
+                  <option value="cursor">Cursor</option>
+                  <option value="copilot">GitHub Copilot</option>
+                  <option value="grok">Grok (xAI)</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="human_answer">Your Answer</label>
+                <input type="text" id="human_answer" class="form-input" placeholder="e.g. min-width: 0" />
+              </div>
+
+              <button id="human-submit-btn" class="btn btn-primary">
+                Start &amp; Submit Challenge
+              </button>
+              <p class="form-hint" style="margin-top: 0.5rem;">Timer starts when you click. First attempt earns full efficiency bonus.</p>
+
+              <div id="human-result" class="submit-result" aria-live="polite" style="margin-top: 0.75rem;"></div>
+            </section>
+          )}
+
+          {puzzle.category === 'agentic_engineering' && !currentUser && (
+            <div class="callout callout-muted" style="margin-top: 0.5rem;">
+              <a href="/api/auth/signin">Sign in with GitHub →</a> to compete in human challenges.
+            </div>
+          )}
+
+          <section class="puzzle-submit-curl card">
             <!-- curl alternatives -->
             <div class="curl-alt">
               <div class="curl-alt-header">
@@ -467,6 +516,61 @@ const curlPractice = `curl -X POST https://open-rank.com/api/submit \\
     } finally {
       btn.disabled = false;
       btn.textContent = 'Submit Answer →';
+    }
+  });
+
+  // ── Human Challenge ────────────────────────────────────────
+  const humanBtn = document.getElementById('human-submit-btn') as HTMLButtonElement | null;
+  const humanResult = document.getElementById('human-result') as HTMLElement | null;
+  const puzzleId = (document.querySelector('input[name="puzzle_id"]') as HTMLInputElement | null)?.value;
+
+  humanBtn?.addEventListener('click', async () => {
+    const answer = (document.getElementById('human_answer') as HTMLInputElement | null)?.value?.trim();
+    const ai_tool = (document.getElementById('ai_tool') as HTMLSelectElement | null)?.value;
+
+    if (!answer) { humanResult!.textContent = 'Please enter your answer.'; return; }
+    if (!ai_tool) { humanResult!.textContent = 'Please select your AI tool.'; return; }
+
+    humanBtn.textContent = 'Submitting...';
+    humanBtn.setAttribute('disabled', 'true');
+
+    try {
+      // 1. Start the challenge timer (creates/reuses a session scoped to user)
+      const startRes = await fetch('/api/puzzle/start-challenge', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ puzzle_id: puzzleId }),
+      });
+
+      if (!startRes.ok) {
+        const err = await startRes.json().catch(() => ({}));
+        humanResult!.textContent = err.error ?? 'Failed to start challenge. Are you signed in?';
+        humanBtn.textContent = 'Start & Submit Challenge';
+        humanBtn.removeAttribute('disabled');
+        return;
+      }
+
+      const { session_id } = await startRes.json();
+
+      // 2. Submit the answer
+      const submitRes = await fetch('/api/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ puzzle_id: puzzleId, answer, session_id, ai_tool, is_human: true }),
+      });
+      const result = await submitRes.json();
+
+      if (result.correct) {
+        humanResult!.innerHTML = `✅ Correct! Score: <strong>${result.score}</strong>/100 · Speed: ${result.breakdown?.speed_bonus ?? 0}pts · Efficiency: ${result.breakdown?.efficiency_bonus ?? 0}pts`;
+      } else {
+        humanResult!.innerHTML = `❌ Incorrect. Try again — but each wrong attempt reduces your efficiency bonus.`;
+        humanBtn.textContent = 'Try Again';
+        humanBtn.removeAttribute('disabled');
+      }
+    } catch {
+      humanResult!.textContent = 'Submission failed. Try again.';
+      humanBtn.textContent = 'Start & Submit Challenge';
+      humanBtn.removeAttribute('disabled');
     }
   });
 </script>
@@ -738,6 +842,38 @@ const curlPractice = `curl -X POST https://open-rank.com/api/submit \\
     background: var(--surface-2, #1e1e1e);
     color: var(--dim);
     border: 1px solid var(--border);
+  }
+
+  /* ── Human Challenge ── */
+  .human-challenge {
+    border: 1px solid #3b82f620;
+    background: #3b82f606;
+  }
+
+  .section-sub {
+    font-size: 0.9rem;
+    color: var(--dim);
+    margin-top: -0.5rem;
+    margin-bottom: 1rem;
+  }
+
+  .scoring-pills {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.75rem;
+  }
+
+  .scoring-pills span {
+    display: inline-flex;
+    align-items: center;
+    background: var(--surface-2, #f5f5f5);
+    border: 1px solid var(--border);
+    border-radius: 99px;
+    padding: 0.25em 0.75em;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--text);
   }
 
   /* ── Sidebar ── */

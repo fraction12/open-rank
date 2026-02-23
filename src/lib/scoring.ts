@@ -69,3 +69,15 @@ export function computeEfficiencyBonus(tokens_used: number | null | undefined, b
   const ratio = best_tokens / tokens_used;
   return Math.round(Math.min(20, 20 * Math.min(ratio, 1)));
 }
+
+/**
+ * Efficiency bonus for human submissions — based on attempt number.
+ * First attempt = max bonus; subsequent attempts = diminishing returns.
+ */
+export function computeHumanEfficiencyBonus(attemptNumber: number | null | undefined): number {
+  if (!attemptNumber || attemptNumber <= 0) return 0;
+  if (attemptNumber === 1) return 20;
+  if (attemptNumber === 2) return 10;
+  if (attemptNumber === 3) return 5;
+  return 0;
+}

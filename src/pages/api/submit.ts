@@ -1,7 +1,7 @@
 import type { APIRoute } from 'astro';
-import { supabase, getAgentByKey } from '../../lib/supabase';
+import { supabase, getAgentByKey, getCurrentUser } from '../../lib/supabase';
 import { saltedHash } from '../../lib/hash';
-import { computeSpeedBonus, computeEfficiencyBonus } from '../../lib/scoring';
+import { computeSpeedBonus, computeEfficiencyBonus, computeHumanEfficiencyBonus } from '../../lib/scoring';
 import { checkRateLimit } from '../../lib/rate-limit';
 import { corsHeaders } from '../../lib/cors';
 import { json } from '../../lib/response';
@@ -11,7 +11,7 @@ export const OPTIONS: APIRoute = async ({ request }) => {
   return new Response(null, { status: 204, headers: corsHeaders(request) });
 };
 
-export const POST: APIRoute = async ({ request }) => {
+export const POST: APIRoute = async ({ request, cookies }) => {
   const cors = corsHeaders(request);
 
   // ── Parse body ──────────────────────────────────────────
@@ -45,9 +45,36 @@ export const POST: APIRoute = async ({ request }) => {
     skill_used?: string;
   };
 
+  // ── Human challenge fields ───────────────────────────────
+  const is_human = body.is_human === true;
+  const ai_tool = typeof body.ai_tool === 'string' ? (body.ai_tool as string).slice(0, 100) : null;
+
   // ── Validate required fields ─────────────────────────────
   if (!puzzle_id || typeof puzzle_id !== 'string') return json({ error: 'puzzle_id is required' }, 400, cors);
   if (!answer   || typeof answer   !== 'string') return json({ error: 'answer is required' }, 400, cors);
+
+  // ── Human challenge path ─────────────────────────────────
+  // When is_human=true, we require GitHub auth instead of an api_key
+  let humanUserId: string | null = null;
+  let humanAttemptNumber: number | null = null;
+
+  if (is_human) {
+    const currentUser = await getCurrentUser(cookies);
+    if (!currentUser) return json({ error: 'Authentication required for human challenges. Sign in with GitHub.' }, 401, cors);
+    humanUserId = currentUser.id;
+
+    if (!supabase) return json({ error: 'Database not configured' }, 503, cors);
+
+    // Count previous submissions for this user+puzzle to determine attempt number
+    const { count: prevCount } = await supabase
+      .from('submissions')
+      .select('id', { count: 'exact', head: true })
+      .eq('puzzle_id', puzzle_id)
+      .eq('user_id', humanUserId)
+      .eq('is_human', true);
+
+    humanAttemptNumber = (prevCount ?? 0) + 1;
+  }
 
   // ── Resolve agent identity ───────────────────────────────
   // api_key present → ranked submission; absent → practice mode
@@ -55,7 +82,11 @@ export const POST: APIRoute = async ({ request }) => {
   let agentName: string = 'anonymous';
   let isPractice = true;
 
-  if (api_key && typeof api_key === 'string') {
+  if (is_human) {
+    // Human submissions: not an agent, treat as a special ranked human mode
+    agentName = 'human';
+    isPractice = false;
+  } else if (api_key && typeof api_key === 'string') {
     const agent = await getAgentByKey(api_key);
     if (!agent) return json({ error: 'Invalid API key' }, 401, cors);
     agentId = agent.id;
@@ -110,21 +141,38 @@ export const POST: APIRoute = async ({ request }) => {
   // ── Server-side timing: look up session ──────────────────
   let realTimeMs: number | null = null;
 
-  if (session_id && typeof session_id === 'string' && api_key && typeof api_key === 'string') {
-    // Atomic UPDATE: only succeeds if session is unused, matches puzzle, and belongs to this api_key
-    // Combines H2 (session scoping) + H3 (TOCTOU-safe atomic update)
-    const { data: session } = await supabase
-      .from('puzzle_sessions')
-      .update({ used: true })
-      .eq('id', session_id)
-      .eq('used', false)
-      .eq('puzzle_id', puzzle_id)
-      .eq('api_key', api_key)
-      .select('started_at')
-      .single();
+  if (session_id && typeof session_id === 'string') {
+    if (is_human && humanUserId) {
+      // Human session: scoped to user_id (not api_key)
+      const { data: session } = await supabase!
+        .from('puzzle_sessions')
+        .update({ used: true })
+        .eq('id', session_id)
+        .eq('used', false)
+        .eq('puzzle_id', puzzle_id)
+        .eq('user_id', humanUserId)
+        .select('started_at')
+        .single();
 
-    if (session) {
-      realTimeMs = Date.now() - new Date(session.started_at).getTime();
+      if (session) {
+        realTimeMs = Date.now() - new Date(session.started_at).getTime();
+      }
+    } else if (api_key && typeof api_key === 'string') {
+      // Atomic UPDATE: only succeeds if session is unused, matches puzzle, and belongs to this api_key
+      // Combines H2 (session scoping) + H3 (TOCTOU-safe atomic update)
+      const { data: session } = await supabase!
+        .from('puzzle_sessions')
+        .update({ used: true })
+        .eq('id', session_id)
+        .eq('used', false)
+        .eq('puzzle_id', puzzle_id)
+        .eq('api_key', api_key)
+        .select('started_at')
+        .single();
+
+      if (session) {
+        realTimeMs = Date.now() - new Date(session.started_at).getTime();
+      }
     }
   }
 
@@ -138,7 +186,7 @@ export const POST: APIRoute = async ({ request }) => {
   let bestTokens: number | null = null;
 
   if (correct) {
-    const { data: bestSubs } = await supabase
+    const { data: bestSubs } = await supabase!
       .from('submissions')
       .select('time_ms, tokens_used')
       .eq('puzzle_id', puzzle_id)
@@ -166,11 +214,14 @@ export const POST: APIRoute = async ({ request }) => {
 
   const correctness = correct ? 50 : 0;
   const speed_bonus = correct ? computeSpeedBonus(timeForScoring, bestTimeMs) : 0;
-  const efficiency_bonus = correct ? computeEfficiencyBonus(tokens_used, bestTokens) : 0;
+  // Human submissions: efficiency based on attempt number; agent submissions: based on tokens
+  const efficiency_bonus = correct
+    ? (is_human ? computeHumanEfficiencyBonus(humanAttemptNumber) : computeEfficiencyBonus(tokens_used, bestTokens))
+    : 0;
   const score = correctness + speed_bonus + efficiency_bonus;
 
   // ── Insert submission ─────────────────────────────────────
-  const { data: inserted, error: insErr } = await supabase
+  const { data: inserted, error: insErr } = await supabase!
     .from('submissions')
     .insert({
       puzzle_id,
@@ -185,6 +236,11 @@ export const POST: APIRoute = async ({ request }) => {
       is_practice: isPractice,
       session_id: session_id ?? null,
       skill_used: (skill_used as string | undefined)?.trim() ?? null,
+      // Human challenge fields
+      is_human: is_human,
+      ai_tool: ai_tool ?? null,
+      attempt_number: is_human ? humanAttemptNumber : null,
+      user_id: is_human ? humanUserId : null,
     })
     .select('id')
     .single();
@@ -197,7 +253,7 @@ export const POST: APIRoute = async ({ request }) => {
   // ── Calculate rank (only among ranked submissions) ────────
   let rank: number = 1;
   if (!isPractice) {
-    const { count } = await supabase
+    const { count } = await supabase!
       .from('submissions')
       .select('id', { count: 'exact', head: true })
       .eq('puzzle_id', puzzle_id)

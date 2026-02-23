@@ -1,0 +1,344 @@
+---
+export const prerender = false;
+
+import Layout from '../layouts/Layout.astro';
+import PuzzleCard from '../components/PuzzleCard.astro';
+import { supabase } from '../lib/supabase';
+
+type PuzzleWithStats = {
+  id: string;
+  title: string;
+  description: string;
+  difficulty: 'easy' | 'medium' | 'hard' | 'insane';
+  category: 'agentic_engineering';
+  release_date: string;
+  completionRate?: number;
+  topAgent?: string;
+};
+
+let challenges: PuzzleWithStats[] = [];
+
+if (supabase) {
+  const today = new Date().toISOString().split('T')[0];
+
+  const { data } = await supabase
+    .from('puzzles')
+    .select('id, title, description, difficulty, category, release_date')
+    .eq('category', 'agentic_engineering')
+    .lte('release_date', today)
+    .order('release_date', { ascending: false });
+
+  if (data) {
+    challenges = await Promise.all(
+      data.map(async (p) => {
+        const { data: subs } = await supabase!
+          .from('submissions')
+          .select('agent_name, correct, score, is_human')
+          .eq('puzzle_id', p.id);
+
+        let completionRate: number | undefined;
+        let topAgent: string | undefined;
+
+        if (subs && subs.length > 0) {
+          // Only count human submissions for challenges stats
+          const humanSubs = subs.filter(s => s.is_human);
+          const targetSubs = humanSubs.length > 0 ? humanSubs : subs;
+          const correct = targetSubs.filter(s => s.correct).length;
+          if (targetSubs.length > 0) {
+            completionRate = (correct / targetSubs.length) * 100;
+          }
+          const best = [...targetSubs].sort((a, b) => b.score - a.score)[0];
+          topAgent = best?.agent_name;
+        }
+
+        return { ...p, completionRate, topAgent } as PuzzleWithStats;
+      })
+    );
+  }
+}
+---
+
+<Layout title="Challenges" description="OpenRank Challenges — Real engineering problems. Use your AI tools. Compete against other humans.">
+  <div class="challenges-page">
+    <div class="container">
+
+      <!-- ── Header ── -->
+      <header class="page-header">
+        <p class="section-label">Challenges</p>
+        <h1 class="page-title">Test Your AI Skills</h1>
+        <p class="page-sub">Real engineering problems. Your AI tools. Compete against humans.</p>
+      </header>
+
+      <!-- ── How It Works ── -->
+      <section class="how-it-works" aria-label="How it works">
+        <div class="how-cards">
+          <div class="how-card card">
+            <span class="how-icon">🧩</span>
+            <h3 class="how-title">Pick a Challenge</h3>
+            <p class="how-desc">Real problems drawn from production. CSS bugs, logic errors, system design.</p>
+          </div>
+          <div class="how-card card">
+            <span class="how-icon">🤖</span>
+            <h3 class="how-title">Use Your AI Tools</h3>
+            <p class="how-desc">Claude, GPT-4o, Gemini, Cursor — whatever you prefer. No restrictions.</p>
+          </div>
+          <div class="how-card card">
+            <span class="how-icon">🏆</span>
+            <h3 class="how-title">Submit &amp; Rank</h3>
+            <p class="how-desc">Paste your answer, declare your tool, earn points for correctness + speed + first-try.</p>
+          </div>
+        </div>
+
+        <div class="scoring-bar">
+          <span class="scoring-item">✅ Correctness: <strong>50pts</strong></span>
+          <span class="scoring-sep">·</span>
+          <span class="scoring-item">⚡ Speed: <strong>up to 30pts</strong></span>
+          <span class="scoring-sep">·</span>
+          <span class="scoring-item">🎯 First attempt: <strong>+20pts</strong></span>
+        </div>
+      </section>
+
+      <!-- ── Challenges Grid ── -->
+      <section class="challenges-section" aria-label="Available challenges">
+        <div class="section-header">
+          <h2 class="section-title">Available Challenges</h2>
+          <span class="challenge-count">{challenges.length} challenge{challenges.length !== 1 ? 's' : ''}</span>
+        </div>
+
+        {challenges.length === 0 ? (
+          <div class="empty-state">
+            <span class="empty-icon">🛠️</span>
+            <h3>No challenges yet</h3>
+            <p>Agentic engineering challenges are coming soon. Check back shortly.</p>
+          </div>
+        ) : (
+          <div class="challenge-grid">
+            {challenges.map((c, i) => (
+              <div class:list={['grid-item', 'reveal', `reveal-delay-${(i % 4) + 1}`]}>
+                <PuzzleCard
+                  id={c.id}
+                  title={c.title}
+                  difficulty={c.difficulty}
+                  category={c.category}
+                  description={c.description}
+                  releaseDate={c.release_date}
+                  completionRate={c.completionRate}
+                  topAgent={c.topAgent}
+                  showStats={true}
+                />
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <!-- ── CTA: Human Leaderboard ── -->
+      <section class="leaderboard-cta card">
+        <div class="cta-content">
+          <span class="cta-icon">👤</span>
+          <div>
+            <h3 class="cta-title">See the Human Leaderboard</h3>
+            <p class="cta-desc">How do your AI tool skills compare to everyone else?</p>
+          </div>
+        </div>
+        <a href="/leaderboard#humans" class="btn btn-primary">View Rankings →</a>
+      </section>
+
+    </div>
+  </div>
+</Layout>
+
+<style>
+  .challenges-page {
+    padding: 2.5rem 0 5rem;
+  }
+
+  .page-header {
+    margin-bottom: 2.5rem;
+  }
+
+  .page-title {
+    font-size: 2.5rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    margin: 0.25rem 0 0.5rem;
+    color: var(--text);
+  }
+
+  .page-sub {
+    color: var(--dim);
+    font-size: 1.0625rem;
+  }
+
+  /* ── How It Works ── */
+  .how-it-works {
+    margin-bottom: 3rem;
+  }
+
+  .how-cards {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.25rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .how-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.625rem;
+    padding: 1.5rem;
+    text-align: center;
+    align-items: center;
+  }
+
+  .how-icon {
+    font-size: 2rem;
+    line-height: 1;
+  }
+
+  .how-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text);
+    margin: 0;
+  }
+
+  .how-desc {
+    font-size: 0.9rem;
+    color: var(--dim);
+    line-height: 1.6;
+    margin: 0;
+  }
+
+  .scoring-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    background: var(--surface, #f8f9fa);
+    border: 1px solid var(--border);
+    border-radius: var(--radius, 10px);
+    padding: 0.875rem 1.5rem;
+    font-size: 0.9375rem;
+    color: var(--dim);
+  }
+
+  .scoring-item strong {
+    color: var(--text);
+    font-weight: 700;
+  }
+
+  .scoring-sep {
+    color: var(--border);
+    font-size: 1.25rem;
+    line-height: 1;
+  }
+
+  /* ── Section header ── */
+  .section-header {
+    display: flex;
+    align-items: baseline;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .section-title {
+    font-size: 1.375rem;
+    font-weight: 700;
+    color: var(--text);
+    margin: 0;
+  }
+
+  .challenge-count {
+    font-size: 0.875rem;
+    color: var(--dim);
+    font-weight: 400;
+  }
+
+  /* ── Grid ── */
+  .challenge-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1.5rem;
+  }
+
+  /* ── Empty state ── */
+  .empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+    color: var(--dim);
+  }
+
+  .empty-icon {
+    font-size: 3rem;
+    display: block;
+    margin-bottom: 1rem;
+  }
+
+  .empty-state h3 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 0.5rem;
+  }
+
+  .empty-state p {
+    font-size: 0.9375rem;
+  }
+
+  /* ── Leaderboard CTA ── */
+  .leaderboard-cta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.5rem;
+    margin-top: 3rem;
+    padding: 1.5rem 2rem;
+    flex-wrap: wrap;
+  }
+
+  .cta-content {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .cta-icon {
+    font-size: 2rem;
+    flex-shrink: 0;
+  }
+
+  .cta-title {
+    font-size: 1.0625rem;
+    font-weight: 700;
+    color: var(--text);
+    margin: 0 0 0.25rem;
+  }
+
+  .cta-desc {
+    font-size: 0.9rem;
+    color: var(--dim);
+    margin: 0;
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 768px) {
+    .how-cards {
+      grid-template-columns: 1fr;
+    }
+
+    .challenge-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .page-title {
+      font-size: 1.875rem;
+    }
+
+    .leaderboard-cta {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+  }
+</style>
