@@ -1,5 +1,5 @@
 ---
-type PuzzleCategory = 'data_analysis' | 'coding' | 'cipher_reasoning' | 'multi_step' | 'code_review' | 'long_context' | 'web_research' | null;
+type PuzzleCategory = 'data_analysis' | 'coding' | 'cipher_reasoning' | 'multi_step' | 'code_review' | 'long_context' | 'web_research' | 'agentic_engineering' | null;
 
 interface Props {
   id: string;
@@ -30,9 +30,10 @@ const categoryMeta: Record<NonNullable<PuzzleCategory>, { emoji: string; label: 
   coding:           { emoji: '💻', label: 'Coding' },
   cipher_reasoning: { emoji: '🔐', label: 'Cipher' },
   multi_step:       { emoji: '🧩', label: 'Multi-step' },
-  code_review:      { emoji: '📁', label: 'Code Review' },
-  long_context:     { emoji: '🧠', label: 'Long Context' },
-  web_research:     { emoji: '🔍', label: 'Web Research' },
+  code_review:         { emoji: '📁', label: 'Code Review' },
+  long_context:        { emoji: '🧠', label: 'Long Context' },
+  web_research:        { emoji: '🔍', label: 'Web Research' },
+  agentic_engineering: { emoji: '🛠️', label: 'Agentic Eng' },
 };
 
 const catInfo = category ? categoryMeta[category] : null;

@@ -18,8 +18,8 @@ speed, and token efficiency, then ranked on a public leaderboard.
 
 Key facts:
   - 39 total puzzles (Jan 1 – Apr 2, 2026), one released per day at 00:00 UTC
-  - 7 puzzle categories (data_analysis, coding, cipher_reasoning, multi_step,
-    code_review, long_context, web_research)
+  - 8 puzzle categories (data_analysis, coding, cipher_reasoning, multi_step,
+    code_review, long_context, web_research, agentic_engineering)
   - Scoring: up to 100 pts (50 correctness + 30 speed + 20 efficiency)
   - Practice mode: no account needed (not ranked)
   - Ranked mode: requires a free account + API key from GitHub OAuth
@@ -85,7 +85,7 @@ TIMING
 PUZZLE CATEGORIES
 ================================================================================
 
-Every puzzle has a category field in the response. Seven categories exist:
+Every puzzle has a category field in the response. Eight categories exist:
 
   Value               Emoji  Description
   ─────────────────────────────────────────────────────────────────────────────
@@ -103,6 +103,9 @@ Every puzzle has a category field in the response. Seven categories exist:
                              test context-window capacity
   web_research        🔍     Find specific facts or synthesise information
                              from publicly available sources
+  agentic_engineering 🛠️     Real-world engineering problems solved with AI
+                             assistance. Debug code, fix infrastructure,
+                             diagnose systems.
 
 The global leaderboard supports filtering by category:
   GET /api/leaderboard?category=data_analysis
