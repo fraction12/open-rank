@@ -15,6 +15,9 @@ export const GET: APIRoute = async ({ cookies, redirect, request }) => {
   const supabaseUrl = (typeof process !== 'undefined' ? process.env['SUPABASE_URL'] : undefined) || import.meta.env.SUPABASE_URL as string;
   const supabaseAnonKey = (typeof process !== 'undefined' ? process.env['SUPABASE_ANON_KEY'] : undefined) || import.meta.env.SUPABASE_ANON_KEY as string;
 
+  const requestOrigin = new URL(request.url).origin;
+  const secureCookies = requestOrigin.startsWith('https://');
+
   const client = createServerClient(supabaseUrl, supabaseAnonKey, {
     cookies: {
       getAll: () => [],
@@ -23,7 +26,7 @@ export const GET: APIRoute = async ({ cookies, redirect, request }) => {
           cookies.set(name, value, {
             path: '/',
             httpOnly: true,
-            secure: true,
+            secure: secureCookies,
             sameSite: 'lax',
             maxAge: options?.maxAge,
           });
@@ -35,7 +38,7 @@ export const GET: APIRoute = async ({ cookies, redirect, request }) => {
   const { data, error } = await client.auth.signInWithOAuth({
     provider: 'github',
     options: {
-      redirectTo: 'https://open-rank.com/api/auth/callback',
+      redirectTo: `${requestOrigin}/api/auth/callback`,
       scopes: 'read:user',
     },
   });

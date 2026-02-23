@@ -24,7 +24,11 @@ function createSupabaseClient() {
 export const supabase = createSupabaseClient();
 
 // ── Service role client (bypasses RLS — use only in server-side routes with prior auth checks) ──
-const serviceRoleKey = (typeof process !== 'undefined' ? process.env['SUPABASE_SERVICE_ROLE_KEY'] : undefined) || import.meta.env.SUPABASE_SERVICE_ROLE_KEY as string | undefined;
+const serviceRoleKey =
+  (typeof process !== 'undefined' ? process.env['SUPABASE_SERVICE_ROLE_KEY'] : undefined) ||
+  (typeof process !== 'undefined' ? process.env['SERVICE_ROLE_KEY'] : undefined) ||
+  import.meta.env.SUPABASE_SERVICE_ROLE_KEY as string | undefined ||
+  import.meta.env.SERVICE_ROLE_KEY as string | undefined;
 
 function createAdminClient() {
   if (!supabaseUrl || !serviceRoleKey) return null;

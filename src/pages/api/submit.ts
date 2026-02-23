@@ -169,13 +169,15 @@ export const POST: APIRoute = async ({ request, cookies }) => {
 
   // ── Load puzzle (only fields needed for verification) ────
   // Use supabaseAdmin — anon SELECT on puzzles is revoked (H2/H5 fix)
+  const today = new Date().toISOString().split('T')[0];
   const { data: puzzle, error: pErr } = await supabaseAdmin
     .from('puzzles')
     .select('id, answer_hash')
     .eq('id', puzzle_id)
+    .lte('release_date', today)
     .single();
 
-  if (pErr || !puzzle) return json({ error: 'Puzzle not found' }, 404, cors);
+  if (pErr || !puzzle) return json({ error: 'Puzzle not found or not yet released' }, 404, cors);
 
   // ── Server-side timing: look up session ──────────────────
   // puzzle_sessions is now locked to service role — must use supabaseAdmin
@@ -287,28 +289,86 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     .single();
 
   if (insErr || !inserted) {
+    if (insErr?.code === '23505' && is_human && humanUserId && correct) {
+      const { data: existingCorrect } = await supabaseAdmin
+        .from('submissions')
+        .select('score')
+        .eq('user_id', humanUserId)
+        .eq('puzzle_id', puzzle_id)
+        .eq('is_human', true)
+        .eq('correct', true)
+        .maybeSingle();
+
+      if (existingCorrect) {
+        return json({ correct: true, score: existingCorrect.score, duplicate: true }, 200, cors);
+      }
+    }
+
     log('error', 'Failed to record submission', { message: insErr?.message });
     return json({ error: 'Failed to record submission' }, 500, cors);
   }
 
   // ── Calculate rank (only among ranked submissions) ────────
-  let rank: number = 1;
-  if (!isPractice) {
-    const { count } = await supabaseAdmin
-      .from('submissions')
-      .select('id', { count: 'exact', head: true })
-      .eq('puzzle_id', puzzle_id)
-      .eq('is_practice', false)
-      .gte('score', score);
+  let rank: number | null = null;
+  if (!isPractice && correct) {
+    if (is_human && humanUserId) {
+      const { data: humanRows } = await supabaseAdmin
+        .from('submissions')
+        .select('user_id, score, time_ms')
+        .eq('puzzle_id', puzzle_id)
+        .eq('is_human', true)
+        .eq('correct', true)
+        .not('user_id', 'is', null);
 
-    rank = count ?? 1;
+      if (humanRows) {
+        const bestByUser = new Map<string, { score: number; time_ms: number | null }>();
+        for (const row of humanRows) {
+          const userId = row.user_id as string | null;
+          if (!userId) continue;
+          const prev = bestByUser.get(userId);
+          if (!prev || row.score > prev.score || (row.score === prev.score && (row.time_ms ?? Number.MAX_SAFE_INTEGER) < (prev.time_ms ?? Number.MAX_SAFE_INTEGER))) {
+            bestByUser.set(userId, { score: row.score, time_ms: row.time_ms });
+          }
+        }
+        const sorted = Array.from(bestByUser.entries()).sort((a, b) => {
+          if (b[1].score !== a[1].score) return b[1].score - a[1].score;
+          return (a[1].time_ms ?? Number.MAX_SAFE_INTEGER) - (b[1].time_ms ?? Number.MAX_SAFE_INTEGER);
+        });
+        const index = sorted.findIndex(([userId]) => userId === humanUserId);
+        rank = index >= 0 ? index + 1 : null;
+      }
+    } else {
+      const { data: aiRows } = await supabaseAdmin
+        .from('submissions')
+        .select('agent_name, score, time_ms')
+        .eq('puzzle_id', puzzle_id)
+        .eq('is_practice', false)
+        .eq('correct', true)
+        .or('is_human.is.null,is_human.eq.false');
+
+      if (aiRows) {
+        const bestByAgent = new Map<string, { score: number; time_ms: number | null }>();
+        for (const row of aiRows) {
+          const prev = bestByAgent.get(row.agent_name);
+          if (!prev || row.score > prev.score || (row.score === prev.score && (row.time_ms ?? Number.MAX_SAFE_INTEGER) < (prev.time_ms ?? Number.MAX_SAFE_INTEGER))) {
+            bestByAgent.set(row.agent_name, { score: row.score, time_ms: row.time_ms });
+          }
+        }
+        const sorted = Array.from(bestByAgent.entries()).sort((a, b) => {
+          if (b[1].score !== a[1].score) return b[1].score - a[1].score;
+          return (a[1].time_ms ?? Number.MAX_SAFE_INTEGER) - (b[1].time_ms ?? Number.MAX_SAFE_INTEGER);
+        });
+        const index = sorted.findIndex(([name]) => name === agentName);
+        rank = index >= 0 ? index + 1 : null;
+      }
+    }
   }
 
   return json(
     {
       correct,
       score,
-      rank: isPractice ? null : rank,
+      rank,
       is_practice: isPractice,
       time_ms: realTimeMs,
       skill_used: skill_used ?? null,

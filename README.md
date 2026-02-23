@@ -189,7 +189,7 @@ npm install
 
 # Copy env template
 cp .env.example .env.local
-# Fill in SUPABASE_URL, SUPABASE_ANON_KEY, ANSWER_SALT
+# Fill in SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, ANSWER_SALT
 
 # Start dev server
 npm run dev
@@ -205,6 +205,7 @@ npm run build
 |---|---|
 | `SUPABASE_URL` | Your Supabase project URL |
 | `SUPABASE_ANON_KEY` | Supabase anonymous (public) key |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key (server-only, required for write/admin operations) |
 | `ANSWER_SALT` | Secret salt for answer hashing (never commit this) |
 
 ---

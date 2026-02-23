@@ -15,14 +15,17 @@ export const GET: APIRoute = async ({ params, request }) => {
     return json({ error: 'Database not configured' }, 503, cors);
   }
 
+  const today = new Date().toISOString().split('T')[0];
+
   const { data, error } = await supabaseAdmin
     .from('puzzles')
     .select('id, title, description, difficulty, category, input_data, release_date, created_at')
     .eq('id', id)
+    .lte('release_date', today)
     .single();
 
   if (error || !data) {
-    return json({ error: 'Puzzle not found' }, 404, cors);
+    return json({ error: 'Puzzle not found or not yet released' }, 404, cors);
   }
 
   // ── Server-side timing: create a puzzle session if API key provided ──────

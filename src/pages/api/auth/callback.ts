@@ -2,12 +2,14 @@ import type { APIRoute } from 'astro';
 import { createServerClient } from '@supabase/ssr';
 import { AUTH_COOKIE_NAME } from '../../../lib/supabase';
 
-export const GET: APIRoute = async ({ url, cookies, redirect }) => {
+export const GET: APIRoute = async ({ url, request, cookies, redirect }) => {
   const code = url.searchParams.get('code');
   if (!code) return redirect('/');
 
   const supabaseUrl = (typeof process !== 'undefined' ? process.env['SUPABASE_URL'] : undefined) || import.meta.env.SUPABASE_URL as string;
   const supabaseAnonKey = (typeof process !== 'undefined' ? process.env['SUPABASE_ANON_KEY'] : undefined) || import.meta.env.SUPABASE_ANON_KEY as string;
+
+  const secureCookies = new URL(request.url).protocol === 'https:';
 
   const client = createServerClient(supabaseUrl, supabaseAnonKey, {
     cookies: {
@@ -27,7 +29,7 @@ export const GET: APIRoute = async ({ url, cookies, redirect }) => {
           cookies.set(name, value, {
             path: '/',
             httpOnly: true,
-            secure: true,
+            secure: secureCookies,
             sameSite: 'lax',
             maxAge: options?.maxAge,
           });

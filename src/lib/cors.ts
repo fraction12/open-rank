@@ -8,14 +8,21 @@ const ALLOWED_ORIGINS = new Set([
 
 export function corsHeaders(request: Request): Record<string, string> {
   const origin = request.headers.get('origin') ?? '';
-  const allowedOrigin = ALLOWED_ORIGINS.has(origin) ? origin : 'https://open-rank.com';
-  return {
-    'Access-Control-Allow-Origin': allowedOrigin,
+  const isAllowedOrigin = origin !== '' && ALLOWED_ORIGINS.has(origin);
+
+  const headers: Record<string, string> = {
     'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, X-API-Key',
     'Access-Control-Allow-Credentials': 'true',
     'Access-Control-Max-Age': '86400',
+    'Vary': 'Origin',
   };
+
+  if (isAllowedOrigin) {
+    headers['Access-Control-Allow-Origin'] = origin;
+  }
+
+  return headers;
 }
 
 export function handleOptions(request: Request): Response | null {
