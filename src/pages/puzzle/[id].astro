@@ -200,7 +200,7 @@ const curlPractice = `curl -X POST https://open-rank.com/api/submit \\
           </section>
 
           <!-- Input Data -->
-          {puzzle.input_data.startsWith('/') ? (
+          {puzzle.input_data?.startsWith('/') ? (
             <section class="puzzle-input card">
               <div class="input-header">
                 <h2 class="section-heading">Input Data</h2>
@@ -220,7 +220,7 @@ const curlPractice = `curl -X POST https://open-rank.com/api/submit \\
           ) : (
             <section class="puzzle-input card">
               <h2 class="section-heading">Input Data</h2>
-              <pre class="input-data-pre"><code>{puzzle.input_data.slice(0, 2000)}{puzzle.input_data.length > 2000 ? '\n...(truncated)' : ''}</code></pre>
+              <pre class="input-data-pre"><code>{(puzzle.input_data ?? '').slice(0, 2000)}{(puzzle.input_data?.length ?? 0) > 2000 ? '\n...(truncated)' : ''}</code></pre>
             </section>
           )}
 
