@@ -3,7 +3,7 @@ export const prerender = false;
 
 import Layout from '../layouts/Layout.astro';
 import PuzzleCard from '../components/PuzzleCard.astro';
-import { supabase } from '../lib/supabase';
+import { supabaseAdmin } from '../lib/supabase';
 
 type PuzzleWithStats = {
   id: string;
@@ -18,42 +18,36 @@ type PuzzleWithStats = {
 
 let challenges: PuzzleWithStats[] = [];
 
-if (supabase) {
-  const today = new Date().toISOString().split('T')[0];
-
-  const { data } = await supabase
-    .from('puzzles')
-    .select('id, title, description, difficulty, category, release_date')
-    .eq('category', 'agentic_engineering')
-    .lte('release_date', today)
-    .order('release_date', { ascending: false });
+if (supabaseAdmin) {
+  // M2 fix: single RPC replaces N+1 queries
+  const { data } = await supabaseAdmin.rpc('challenges_with_stats', { p_limit: 100 });
 
   if (data) {
-    challenges = await Promise.all(
-      data.map(async (p) => {
-        const { data: subs } = await supabase!
-          .from('submissions')
-          .select('agent_name, correct, score, is_human')
-          .eq('puzzle_id', p.id);
-
-        let completionRate: number | undefined;
-        let topAgent: string | undefined;
-
-        if (subs && subs.length > 0) {
-          // Only count human submissions for challenges stats
-          const humanSubs = subs.filter(s => s.is_human);
-          const targetSubs = humanSubs.length > 0 ? humanSubs : subs;
-          const correct = targetSubs.filter(s => s.correct).length;
-          if (targetSubs.length > 0) {
-            completionRate = (correct / targetSubs.length) * 100;
-          }
-          const best = [...targetSubs].sort((a, b) => b.score - a.score)[0];
-          topAgent = best?.agent_name;
-        }
-
-        return { ...p, completionRate, topAgent } as PuzzleWithStats;
-      })
-    );
+    challenges = (data as {
+      id: string;
+      title: string;
+      description: string;
+      difficulty: 'easy' | 'medium' | 'hard' | 'insane';
+      category: 'agentic_engineering';
+      release_date: string;
+      total_attempts: number;
+      unique_solvers: number;
+      best_time_ms: number | null;
+    }[]).map((p) => {
+      const completionRate = p.total_attempts > 0
+        ? (p.unique_solvers / p.total_attempts) * 100
+        : undefined;
+      return {
+        id: p.id,
+        title: p.title,
+        description: p.description,
+        difficulty: p.difficulty,
+        category: p.category,
+        release_date: p.release_date,
+        completionRate,
+        topAgent: undefined,
+      } as PuzzleWithStats;
+    });
   }
 }
 ---

@@ -1,18 +1,18 @@
 import type { APIRoute } from 'astro';
-import { supabase, supabaseAdmin, getAgentByKey } from '../../../lib/supabase';
+import { supabaseAdmin, getAgentByKey } from '../../../lib/supabase';
 import { corsHeaders } from '../../../lib/cors';
 import { json } from '../../../lib/response';
 
 export const GET: APIRoute = async ({ request }) => {
   const cors = corsHeaders(request);
 
-  if (!supabase) {
+  if (!supabaseAdmin) {
     return json({ error: 'Database not configured' }, 503, cors);
   }
 
   const today = new Date().toISOString().split('T')[0];
 
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from('puzzles')
     .select('id, title, description, difficulty, category, input_data, release_date, created_at')
     .eq('release_date', today)
@@ -31,9 +31,6 @@ export const GET: APIRoute = async ({ request }) => {
     const agent = await getAgentByKey(apiKey);
 
     if (agent) {
-      if (!supabaseAdmin) {
-        return json({ error: 'Server misconfigured' }, 503, cors);
-      }
       // Check for existing unused session first to prevent session farming
       const { data: existingSession } = await supabaseAdmin
         .from('puzzle_sessions')

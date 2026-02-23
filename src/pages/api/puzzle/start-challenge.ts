@@ -1,5 +1,5 @@
 import type { APIRoute } from 'astro';
-import { supabase, supabaseAdmin, getCurrentUser } from '../../../lib/supabase';
+import { supabaseAdmin, getCurrentUser } from '../../../lib/supabase';
 import { corsHeaders } from '../../../lib/cors';
 import { json } from '../../../lib/response';
 
@@ -43,10 +43,9 @@ export const POST: APIRoute = async ({ request, cookies }) => {
   if (!supabaseAdmin) return json({ error: 'Database not configured' }, 503, cors);
 
   // ── Verify puzzle exists and is released ──────────────────
-  // Puzzles SELECT is still open to anon — use anon client (or admin as fallback)
-  const puzzleClient = supabase ?? supabaseAdmin;
+  // Use supabaseAdmin — anon SELECT on puzzles is revoked (H2/H5 fix)
   const today = new Date().toISOString().split('T')[0];
-  const { data: puzzle, error: puzzleErr } = await puzzleClient
+  const { data: puzzle, error: puzzleErr } = await supabaseAdmin
     .from('puzzles')
     .select('id, release_date')
     .eq('id', puzzle_id)

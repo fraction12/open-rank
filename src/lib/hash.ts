@@ -25,12 +25,21 @@ export async function sha256Short(text: string, length = 6): Promise<string> {
 export async function saltedHash(answer: string, puzzleId: string): Promise<string> {
   // Use dynamic key to prevent Vite from statically replacing process.env.* at build time.
   // import.meta.env is build-time only for private vars; process.env[key] is runtime-safe.
-  const key = 'ANSWER_SALT';
+  const saltKey = 'ANSWER_SALT';
   const salt =
-    (typeof process !== 'undefined' ? process.env[key] : undefined) ||
-    (typeof import.meta !== 'undefined' ? import.meta.env?.ANSWER_SALT : undefined) ||
-    'dev-salt-not-for-production';
-  return sha256(`${answer}:${puzzleId}:${salt}`);
+    (typeof process !== 'undefined' ? process.env[saltKey] : undefined) ||
+    (typeof import.meta !== 'undefined' ? import.meta.env?.ANSWER_SALT : undefined);
+
+  if (!salt) {
+    if (import.meta.env.PROD) {
+      throw new Error('ANSWER_SALT environment variable is required in production');
+    }
+    // dev fallback only
+    console.warn('⚠️  ANSWER_SALT not set — using dev fallback. Do not use in production!');
+  }
+
+  const ANSWER_SALT = salt || 'dev-salt-not-for-production';
+  return sha256(`${answer}:${puzzleId}:${ANSWER_SALT}`);
 }
 
 /**

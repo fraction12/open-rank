@@ -1,5 +1,5 @@
 import type { APIRoute } from 'astro';
-import { supabase, supabaseAdmin, getAgentByKey, getCurrentUser } from '../../lib/supabase';
+import { supabaseAdmin, getAgentByKey, getCurrentUser } from '../../lib/supabase';
 import { saltedHash } from '../../lib/hash';
 import { computeSpeedBonus, computeEfficiencyBonus, computeHumanEfficiencyBonus } from '../../lib/scoring';
 import { checkRateLimit } from '../../lib/rate-limit';
@@ -46,7 +46,8 @@ export const POST: APIRoute = async ({ request, cookies }) => {
   };
 
   // ── Human challenge fields ───────────────────────────────
-  const is_human = body.is_human === true;
+  // NOTE: is_human is derived server-side (M6 fix) — not trusted from client.
+  // We determine it after we know userId and puzzleId.
   const ai_tool = typeof body.ai_tool === 'string' ? (body.ai_tool as string).slice(0, 100) : null;
 
   // ── Validate required fields ─────────────────────────────
@@ -57,15 +58,37 @@ export const POST: APIRoute = async ({ request, cookies }) => {
   if (!supabaseAdmin) return json({ error: 'Database not configured' }, 503, cors);
 
   // ── Human challenge path ─────────────────────────────────
-  // When is_human=true, we require GitHub auth instead of an api_key
+  // M6 fix: Derive is_human server-side — do NOT trust the client-supplied flag.
+  // If there's no api_key, check if the user has a valid GitHub-authenticated session
+  // with a puzzle_sessions row where is_human=true for this user+puzzle.
+  let is_human = false;
   let humanUserId: string | null = null;
   let humanAttemptNumber: number | null = null;
 
-  if (is_human) {
-    const currentUser = await getCurrentUser(cookies);
-    if (!currentUser) return json({ error: 'Authentication required for human challenges. Sign in with GitHub.' }, 401, cors);
-    humanUserId = currentUser.id;
+  const apiKey = api_key && typeof api_key === 'string' ? api_key : null;
 
+  if (!apiKey) {
+    // Try to get current GitHub-authenticated user
+    const currentUser = await getCurrentUser(cookies);
+    if (currentUser) {
+      // Check if a human session exists for this user+puzzle
+      // Human sessions: user_id is set + api_key is null (created via start-challenge)
+      const { data: humanSession } = await supabaseAdmin
+        .from('puzzle_sessions')
+        .select('id')
+        .eq('user_id', currentUser.id)
+        .eq('puzzle_id', puzzle_id)
+        .is('api_key', null)
+        .maybeSingle();
+
+      if (humanSession) {
+        is_human = true;
+        humanUserId = currentUser.id;
+      }
+    }
+  }
+
+  if (is_human && humanUserId) {
     // C1: Prevent duplicate correct human submissions (score farming)
     // Check for an existing correct submission before counting attempts
     const { data: existingCorrect } = await supabaseAdmin
@@ -144,10 +167,8 @@ export const POST: APIRoute = async ({ request, cookies }) => {
   }
 
   // ── Load puzzle (only fields needed for verification) ────
-  // Puzzles SELECT is still open to anon — use cookie-based client (or supabase) here.
-  // Fall back to supabaseAdmin if anon client not available.
-  const puzzleClient = supabase ?? supabaseAdmin;
-  const { data: puzzle, error: pErr } = await puzzleClient
+  // Use supabaseAdmin — anon SELECT on puzzles is revoked (H2/H5 fix)
+  const { data: puzzle, error: pErr } = await supabaseAdmin
     .from('puzzles')
     .select('id, answer_hash')
     .eq('id', puzzle_id)

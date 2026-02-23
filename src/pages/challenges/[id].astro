@@ -2,15 +2,15 @@
 export const prerender = false;
 
 import Layout from '../../layouts/Layout.astro';
-import { getCurrentUser, supabase } from '../../lib/supabase';
+import { getCurrentUser, supabaseAdmin } from '../../lib/supabase';
 
 const { id } = Astro.params;
 
-if (!id || !supabase) return Astro.redirect('/challenges');
+if (!id || !supabaseAdmin) return Astro.redirect('/challenges');
 
 const today = new Date().toISOString().split('T')[0];
 
-const { data: puzzle } = await supabase
+const { data: puzzle } = await supabaseAdmin
   .from('puzzles')
   .select('id, title, description, difficulty, category, input_data, release_date')
   .eq('id', id)
@@ -21,7 +21,7 @@ if (!puzzle || puzzle.release_date > today) return Astro.redirect('/challenges')
 
 const currentUser = await getCurrentUser(Astro.cookies);
 
-const { data: topHumans } = await supabase.rpc('leaderboard_humans_by_puzzle', {
+const { data: topHumans } = await supabaseAdmin.rpc('leaderboard_humans_by_puzzle', {
   p_puzzle_id: id,
   p_limit: 5,
 });
@@ -275,9 +275,24 @@ const difficultyLabel: Record<string, string> = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ puzzle_id: puzzleId }),
       });
+      if (!res.ok) {
+        throw new Error(`Server error: ${res.status}`);
+      }
       const data = await res.json();
-      sessionId = data.session_id ?? null;
-    } catch {}
+      if (!data.session_id) {
+        throw new Error('No session returned');
+      }
+      sessionId = data.session_id;
+    } catch (err) {
+      console.error('Failed to start challenge:', err);
+      startBtn.textContent = '▶ Start Challenge';
+      startBtn.disabled = false;
+      const errorEl = document.createElement('p');
+      errorEl.style.cssText = 'color:#dc2626;font-size:0.875rem;margin-top:0.75rem;';
+      errorEl.textContent = 'Failed to start challenge. Please refresh and try again.';
+      startBtn.insertAdjacentElement('afterend', errorEl);
+      return; // Do NOT start the timer
+    }
 
     startTimestamp = Date.now();
     attemptCount = 0;
@@ -347,7 +362,7 @@ const difficultyLabel: Record<string, string> = {
         const hints = ['', '+20pts', '+10pts', '+5pts'];
         const hintEl = document.getElementById('efficiency-hint');
         if (nextAttempt <= 3) {
-          hintEl.textContent = `Attempt ${nextAttempt} = ${hints[nextAttempt]} efficiency bonus`;
+          hintEl.textContent = `Next attempt bonus: ${hints[nextAttempt]} efficiency`;
         } else {
           hintEl.textContent = 'No efficiency bonus remaining';
         }

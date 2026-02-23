@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { createServerClient } from '@supabase/ssr';
+import type { AstroCookies } from 'astro';
 
 // Use dynamic key access to prevent Vite/build tools from statically inlining env vars.
 // process.env is runtime-safe in Vercel serverless; import.meta.env is build-time fallback.
@@ -35,7 +36,7 @@ function createAdminClient() {
 export const supabaseAdmin = createAdminClient();
 
 // ── Helper: get current user from request cookies ───────────────────────────
-export async function getCurrentUser(cookies: any) {
+export async function getCurrentUser(cookies: AstroCookies) {
   if (!supabaseUrl || !supabaseAnonKey) return null;
 
   // Build a server client using the @supabase/ssr approach
