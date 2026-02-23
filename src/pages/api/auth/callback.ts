@@ -1,6 +1,5 @@
 import type { APIRoute } from 'astro';
 import { createServerClient } from '@supabase/ssr';
-import { supabase } from '../../../lib/supabase';
 
 export const GET: APIRoute = async ({ url, cookies, redirect }) => {
   const code = url.searchParams.get('code');
@@ -40,18 +39,21 @@ export const GET: APIRoute = async ({ url, cookies, redirect }) => {
 
   if (error || !data.user) return redirect('/?auth=error');
 
-  // Upsert user in our users table
+  // Upsert user in our users table — use the authenticated client so RLS INSERT policy passes
   const providerId = data.user.user_metadata?.provider_id ?? data.user.user_metadata?.sub;
   const githubId = parseInt(String(providerId));
   const githubLogin = data.user.user_metadata?.user_name ?? data.user.user_metadata?.preferred_username;
   const avatarUrl = data.user.user_metadata?.avatar_url;
 
-  if (supabase && !isNaN(githubId) && githubLogin) {
-    await supabase.from('users').upsert({
+  if (!isNaN(githubId) && githubLogin) {
+    const { error: upsertError } = await client.from('users').upsert({
       github_id: githubId,
       github_login: githubLogin,
       avatar_url: avatarUrl ?? null,
     }, { onConflict: 'github_id' });
+    if (upsertError) {
+      console.error('[auth/callback] users upsert failed:', upsertError.message);
+    }
   }
 
   return redirect('/dashboard');
