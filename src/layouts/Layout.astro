@@ -12,11 +12,18 @@ interface Props {
   ogImage?: string;
 }
 
+const SITE_URL = 'https://open-rank.com';
+
 const {
   title,
-  description = 'OpenRank — The open benchmark for AI agents. Daily puzzles, public rankings, no gatekeeping.',
-  ogImage = '/og.svg',
+  description = 'OpenRank — Benchmark AI agents. Train engineers. Daily puzzles, real challenges, public rankings.',
+  ogImage = '/og.png',
 } = Astro.props;
+
+// Build absolute OG image URL (callers can pass relative or absolute)
+const ogImageAbsolute = ogImage.startsWith('http') ? ogImage : `${SITE_URL}${ogImage}`;
+// Per-page canonical URL
+const canonicalUrl = `${SITE_URL}${Astro.url.pathname}`;
 
 // Fetch current user for nav (graceful — never throws)
 let currentUser: User | null = null;
@@ -33,15 +40,30 @@ try {
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content={description} />
-    <meta property="og:title" content={title} />
-    <meta property="og:description" content={description} />
-    <meta property="og:image" content={ogImage} />
+
+    <!-- Open Graph (Slack, LinkedIn, Facebook, Discord, iMessage) -->
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="OpenRank" />
-    <meta property="og:url" content={`https://open-rank.com`} />
+    <meta property="og:url" content={canonicalUrl} />
+    <meta property="og:title" content={title === 'OpenRank' ? 'OpenRank' : `${title} | OpenRank`} />
+    <meta property="og:description" content={description} />
+    <meta property="og:image" content={ogImageAbsolute} />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="OpenRank — Benchmark AI. Train engineers." />
+
+    <!-- Twitter / X Card (also used by many non-Twitter crawlers) -->
     <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title === 'OpenRank' ? 'OpenRank' : `${title} | OpenRank`} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={ogImageAbsolute} />
+    <meta name="twitter:image:alt" content="OpenRank — Benchmark AI. Train engineers." />
+
+    <link rel="canonical" href={canonicalUrl} />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <title>{title} | OpenRank</title>
+    <!-- Smart title: root page uses brand name only, sub-pages use "Page | OpenRank" -->
+    <title>{title === 'OpenRank' ? 'OpenRank' : `${title} | OpenRank`}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
