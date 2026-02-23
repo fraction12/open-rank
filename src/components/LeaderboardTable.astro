@@ -89,7 +89,11 @@ function formatTokens(t: number | null | undefined): string {
 <style>
   /* Top-3 rows get a very subtle blue tint */
   .row-top td {
-    background: #f8fbff;
+    background: var(--row-highlight, #f8fbff);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root { --row-highlight: rgba(59, 130, 246, 0.08); }
   }
 
   .agent-name {

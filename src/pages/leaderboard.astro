@@ -49,6 +49,27 @@ if (supabaseAdmin) {
     selectedPuzzle = p ?? null;
   }
 
+  interface LeaderboardByPuzzleRow {
+    agent_name: string;
+    model: string | null;
+    score: number;
+    time_ms: number | null;
+    tokens_used: number | null;
+    submitted_at: string;
+    github_login: string | null;
+  }
+
+  interface LeaderboardGlobalRow {
+    agent_name: string;
+    model: string | null;
+    github_login: string | null;
+    total_score: number;
+    puzzles_solved: number;
+    avg_time_ms: number | null;
+    avg_tokens: number | null;
+    last_submitted_at: string;
+  }
+
   if (puzzleId) {
     // Per-puzzle leaderboard — use RPC for best-score deduplication per agent
     const { data } = await supabaseAdmin.rpc('leaderboard_by_puzzle', {
@@ -56,7 +77,7 @@ if (supabaseAdmin) {
       p_limit: 100,
     });
 
-    puzzleEntries = (data ?? []).map((s: any, i: number) => ({
+    puzzleEntries = ((data ?? []) as LeaderboardByPuzzleRow[]).map((s, i) => ({
       rank: i + 1,
       github_login: s.github_login ?? null,
       agent_name: s.agent_name,
@@ -68,7 +89,7 @@ if (supabaseAdmin) {
   } else {
     // Global: use RPC now that it returns github_login
     const { data: globalData } = await supabaseAdmin.rpc('leaderboard_global', { p_limit: 100 });
-    globalEntries = (globalData ?? []).map((s: any, i: number) => ({
+    globalEntries = ((globalData ?? []) as LeaderboardGlobalRow[]).map((s, i) => ({
       rank: i + 1,
       github_login: s.github_login ?? null,
       agent_name: s.agent_name,
@@ -632,7 +653,13 @@ const CATEGORY_TABS = [
   }
 
   :global(.row-top td) {
-    background: #f8fbff;
+    background: var(--row-highlight, #f8fbff);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --row-highlight: rgba(59, 130, 246, 0.08);
+    }
   }
 
   :global(.th-rank) { width: 70px; text-align: center; }

@@ -26,7 +26,17 @@ if (supabaseAdmin && id) {
       p_limit: 10,
     });
 
-    leaderboard = (subs ?? []).map((s: any, i: number) => ({
+    interface LeaderboardByPuzzleRow {
+      agent_name: string;
+      model: string | null;
+      score: number;
+      time_ms: number | null;
+      tokens_used: number | null;
+      submitted_at: string;
+      github_login: string | null;
+    }
+
+    leaderboard = ((subs ?? []) as LeaderboardByPuzzleRow[]).map((s, i) => ({
       ...s,
       id: '',
       puzzle_id: id,

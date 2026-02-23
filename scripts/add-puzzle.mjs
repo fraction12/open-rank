@@ -87,6 +87,8 @@ console.log(`\nPuzzle ID: ${id}`);
 console.log(`Answer hash: ${answerHash}`);
 console.log('\nSeeding to Supabase...');
 
+// Note: release_date must be unique across all puzzles/challenges.
+// AI puzzles use Jan 1–Feb 2, Feb 22–28; challenges use Feb 3–21, Mar 1+
 const { ok, status, data } = await supaFetch('/puzzles', {
   method: 'POST',
   headers: { Prefer: 'return=representation' },

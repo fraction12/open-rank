@@ -1025,6 +1025,8 @@ for (const challenge of challenges) {
 
   process.stdout.write(`  [${challenge.release_date}] ${challenge.title.slice(0, 50).padEnd(50)} → `);
 
+  // Note: release_date must be unique across all puzzles/challenges.
+  // AI puzzles use Jan 1–Feb 2, Feb 22–28; challenges use Feb 3–21, Mar 1+
   const { ok, status, data } = await supaFetch('/puzzles?on_conflict=release_date', {
     method: 'POST',
     headers: { Prefer: 'resolution=ignore-duplicates,return=representation' },

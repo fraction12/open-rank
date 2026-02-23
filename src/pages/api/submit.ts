@@ -5,6 +5,7 @@ import { computeSpeedBonus, computeEfficiencyBonus, computeHumanEfficiencyBonus 
 import { checkRateLimit } from '../../lib/rate-limit';
 import { corsHeaders } from '../../lib/cors';
 import { json } from '../../lib/response';
+import { log } from '../../lib/logger';
 
 // ── OPTIONS preflight (CORS) ─────────────────────────────────────────────────
 export const OPTIONS: APIRoute = async ({ request }) => {
@@ -286,7 +287,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     .single();
 
   if (insErr || !inserted) {
-    console.error('Insert error:', insErr);
+    log('error', 'Failed to record submission', { message: insErr?.message });
     return json({ error: 'Failed to record submission' }, 500, cors);
   }
 

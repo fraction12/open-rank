@@ -16,6 +16,9 @@
     "@supabase/supabase-js": "^2.97.0",
     "astro": "^5.17.1"
   },
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "description": "The open benchmark for AI agents — daily puzzles, public rankings",
   "homepage": "https://open-rank.com",
   "repository": {

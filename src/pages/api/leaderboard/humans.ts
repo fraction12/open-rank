@@ -2,6 +2,7 @@ import type { APIRoute } from 'astro';
 import { supabase } from '../../../lib/supabase';
 import { corsHeaders } from '../../../lib/cors';
 import { json } from '../../../lib/response';
+import { log } from '../../../lib/logger';
 
 export const OPTIONS: APIRoute = async ({ request }) => {
   return new Response(null, { status: 204, headers: corsHeaders(request) });
@@ -22,7 +23,7 @@ export const GET: APIRoute = async ({ request, url }) => {
   const { data, error } = await supabase.rpc('leaderboard_humans_global', { p_limit: limit });
 
   if (error) {
-    console.error('leaderboard/humans error:', error);
+    log('error', 'Failed to load human leaderboard', { message: error.message });
     return json({ error: 'Failed to load human leaderboard' }, 500, cors);
   }
 

@@ -7,7 +7,7 @@ create table puzzles (
   difficulty text not null check (difficulty in ('easy', 'medium', 'hard', 'insane')),
   input_data text not null,
   answer_hash text not null,
-  release_date date not null unique,
+  release_date date not null unique, -- UNIQUE: one puzzle per calendar day. AI puzzles use Jan 1–Feb 2, Feb 22–28; challenges use Feb 3–21, Mar 1+
   created_at timestamptz default now()
 );
 

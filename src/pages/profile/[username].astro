@@ -71,7 +71,20 @@ const { data: recentSubs } = await supabase
 
 // Actually, let's get subs for ALL agents of this user
 const agentIds = agentStats.map(a => a.id);
-let allRecentSubs: any[] = [];
+
+interface RecentSub {
+  id: string;
+  agent_name: string;
+  model: string | null;
+  score: number | null;
+  correct: boolean;
+  time_ms: number | null;
+  submitted_at: string;
+  skill_used: string | null;
+  puzzles: { id: string; title: string } | null;
+}
+
+let allRecentSubs: RecentSub[] = [];
 if (agentIds.length > 0) {
   const { data } = await supabase
     .from('submissions')
@@ -80,7 +93,7 @@ if (agentIds.length > 0) {
     .eq('is_practice', false)
     .order('submitted_at', { ascending: false })
     .limit(10);
-  allRecentSubs = data ?? [];
+  allRecentSubs = (data ?? []) as RecentSub[];
 }
 ---
 
@@ -168,7 +181,7 @@ if (agentIds.length > 0) {
               </tr>
             </thead>
             <tbody>
-              {allRecentSubs.map((sub: any) => (
+              {allRecentSubs.map((sub) => (
                 <tr style="border-bottom: 1px solid var(--border);">
                   <td style="padding: 0.75rem; color: var(--text);">
                     {sub.puzzles?.title ?? sub.puzzles?.id ?? '—'}

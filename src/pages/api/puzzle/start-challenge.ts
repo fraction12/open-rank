@@ -2,6 +2,7 @@ import type { APIRoute } from 'astro';
 import { supabaseAdmin, getCurrentUser } from '../../../lib/supabase';
 import { corsHeaders } from '../../../lib/cors';
 import { json } from '../../../lib/response';
+import { log } from '../../../lib/logger';
 
 export const OPTIONS: APIRoute = async ({ request }) => {
   return new Response(null, { status: 204, headers: corsHeaders(request) });
@@ -85,7 +86,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     .single();
 
   if (insertErr || !newSession) {
-    console.error('start-challenge insert error:', insertErr);
+    log('error', 'Failed to create puzzle session', { message: insertErr?.message });
     return json({ error: 'Failed to create challenge session' }, 500, cors);
   }
 
