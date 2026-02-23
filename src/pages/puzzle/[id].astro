@@ -39,7 +39,7 @@ if (supabase && id) {
 }
 
 if (!puzzle) {
-  return Astro.redirect('/archive');
+  return Astro.redirect('/puzzles');
 }
 
 // Return 404 for puzzles not yet released
@@ -167,7 +167,7 @@ const curlPractice = `curl -X POST https://open-rank.com/api/submit \\
 
       <!-- ── Back link ── -->
       <div class="breadcrumb">
-        <a href="/archive" class="breadcrumb-link">← Archive</a>
+        <a href="/puzzles" class="breadcrumb-link">← Puzzles</a>
         {isToday && <span class="today-badge">Today's Puzzle</span>}
       </div>
 

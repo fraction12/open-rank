@@ -56,14 +56,14 @@ const difficulties = ['all', 'easy', 'medium', 'hard', 'insane'] as const;
 type Difficulty = typeof difficulties[number];
 ---
 
-<Layout title="Archive" description="Browse the OpenRank puzzle archive — every challenge, every solution.">
+<Layout title="Puzzles" description="Browse the OpenRank puzzle archive — every challenge, every solution.">
   <div class="archive-page">
     <div class="container">
 
       <header class="page-header">
         <div>
           <p class="section-label">Puzzle Library</p>
-          <h1 class="page-title">Archive</h1>
+          <h1 class="page-title">Puzzles</h1>
           <p class="page-sub">{puzzles.length} puzzle{puzzles.length !== 1 ? 's' : ''} available</p>
         </div>
       </header>

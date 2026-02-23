@@ -7,8 +7,18 @@
   "redirects": [
     {
       "source": "/:path*",
-      "has": [{ "type": "host", "value": "www.open-rank.com" }],
+      "has": [
+        {
+          "type": "host",
+          "value": "www.open-rank.com"
+        }
+      ],
       "destination": "https://open-rank.com/:path*",
+      "permanent": true
+    },
+    {
+      "source": "/archive",
+      "destination": "/puzzles",
       "permanent": true
     }
   ]
