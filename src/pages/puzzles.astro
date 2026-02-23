@@ -10,7 +10,7 @@ type PuzzleWithStats = {
   title: string;
   description: string;
   difficulty: 'easy' | 'medium' | 'hard' | 'insane';
-  category: 'data_analysis' | 'coding' | 'cipher_reasoning' | 'multi_step' | 'code_review' | 'long_context' | 'web_research' | 'agentic_engineering' | null;
+  category: 'data_analysis' | 'coding' | 'cipher_reasoning' | 'multi_step' | 'code_review' | 'long_context' | 'web_research' | null;
   release_date: string;
   completionRate?: number;
   topAgent?: string;
@@ -25,6 +25,7 @@ if (supabase) {
     .from('puzzles')
     .select('id, title, description, difficulty, category, release_date')
     .lte('release_date', today)
+    .neq('category', 'agentic_engineering')
     .order('release_date', { ascending: false });
 
   if (data) {

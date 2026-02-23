@@ -5,7 +5,7 @@ import { json } from '../../../lib/response';
 
 const VALID_CATEGORIES = [
   'data_analysis', 'coding', 'cipher_reasoning', 'multi_step',
-  'code_review', 'long_context', 'web_research', 'agentic_engineering',
+  'code_review', 'long_context', 'web_research',
 ] as const;
 type PuzzleCategory = typeof VALID_CATEGORIES[number];
 
