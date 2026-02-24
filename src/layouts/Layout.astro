@@ -78,8 +78,8 @@ const csrfToken = ensureCsrfCookie(Astro.cookies, Astro.url);
     <main id="main-content">
       <slot />
     </main>
-    <ToastHost />
     <Footer />
+    <ToastHost />
     <script>
       // Scroll-reveal observer
       const observer = new IntersectionObserver(
