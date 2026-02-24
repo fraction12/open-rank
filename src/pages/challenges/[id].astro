@@ -307,7 +307,7 @@ const displayData = isTruncated ? inputData.slice(0, INPUT_DISPLAY_LIMIT) : inpu
 </Layout>
 
 <script define:vars={{ puzzleId: puzzle.id, isLoggedIn: !!currentUser }}>
-  const csrfToken = (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null)?.content ?? '';
+  const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content ?? '';
 
   // ── Copy input data ──────────────────────────────────────────────────────
   document.getElementById('copy-input-btn')?.addEventListener('click', async () => {

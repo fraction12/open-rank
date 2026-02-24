@@ -149,7 +149,7 @@ if (supabaseAdmin) {
 </Layout>
 
 <script>
-  const csrfToken = (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null)?.content ?? '';
+  const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content ?? '';
 
   // ── Sign out ───────────────────────────────────────────────────────────────
   document.getElementById('signout-btn')?.addEventListener('click', async () => {
