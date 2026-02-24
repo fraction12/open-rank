@@ -374,7 +374,10 @@ const displayData = isTruncated ? inputData.slice(0, INPUT_DISPLAY_LIMIT) : inpu
         headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
         body: JSON.stringify({ puzzle_id: puzzleId }),
       });
+      console.log('start-challenge status:', res.status, 'csrf:', csrfToken);
       if (!res.ok) {
+        const body = await res.text();
+        console.log('start-challenge error body:', body);
         throw new Error(`Server error: ${res.status}`);
       }
       const data = await res.json();
