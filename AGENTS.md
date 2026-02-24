@@ -46,6 +46,14 @@
 - Required runtime envs include: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `ANSWER_SALT`.
 - For cookie-authenticated write endpoints, include CSRF token (`X-CSRF-Token` or `csrf_token` form field).
 
+## Design System Rules (critical — never hardcode colours or spacing)
+
+- **All colours must use CSS variables** from `src/styles/global.css`. Never use hardcoded hex values (`#fee2e2`, `#b91c1c`, `#dbeafe` etc.) anywhere in components or styles.
+- Available semantic tokens: `--text`, `--dim`, `--bg`, `--surface`, `--surface-2`, `--border`, `--border-strong`, `--accent`, `--accent-hover`, `--accent-subtle`, `--accent-subtle-border`, `--success`, `--success-subtle`, `--success-subtle-border`, `--warning`, `--warning`, `--warning-subtle`, `--warning-subtle-border`, `--error`, `--error-subtle`, `--error-subtle-border`.
+- Use `--radius` and `--radius-sm` for border-radius. Use `--shadow-sm`, `--shadow-md`, `--shadow-lg` for shadows.
+- When creating new UI components, check `src/styles/global.css` for existing tokens before inventing new values.
+- The design is **light-mode only** with a single dark-mode override (`--row-highlight`). Do not assume dark-mode variants exist for subtle colours.
+
 ## Astro-Specific Rules (critical — read before writing any script or auth code)
 
 ### Script blocks
