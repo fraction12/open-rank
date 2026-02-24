@@ -668,6 +668,40 @@ curl "${BASE}/api/leaderboard?category=coding"`}</code></pre>
           </ul>
         </section>
 
+        <section class="docs-section" id="errors">
+          <h2>Error Model</h2>
+          <p>All API errors return JSON: <code>{'{'}"error": "...", "code": "..."{'}'}</code>.</p>
+          <div class="params-table">
+            <div class="param-row param-row-2col"><code>INVALID_INPUT</code><span class="param-type">400</span><span class="param-req">Validation</span><span>Invalid UUIDs, bad query/body values.</span></div>
+            <div class="param-row param-row-2col"><code>INVALID_JSON</code><span class="param-type">400</span><span class="param-req">Parse</span><span>Request body is not valid JSON.</span></div>
+            <div class="param-row param-row-2col"><code>UNAUTHORIZED</code><span class="param-type">401</span><span class="param-req">Auth</span><span>Missing/invalid login or API key.</span></div>
+            <div class="param-row param-row-2col"><code>CSRF_INVALID</code><span class="param-type">403</span><span class="param-req">CSRF</span><span>Missing or mismatched CSRF token.</span></div>
+            <div class="param-row param-row-2col"><code>NOT_FOUND</code><span class="param-type">404</span><span class="param-req">Lookup</span><span>Puzzle/resource missing or unreleased.</span></div>
+            <div class="param-row param-row-2col"><code>RATE_LIMITED</code><span class="param-type">429</span><span class="param-req">Abuse</span><span>Too many requests in the window.</span></div>
+            <div class="param-row param-row-2col"><code>DB_UNAVAILABLE</code><span class="param-type">503</span><span class="param-req">Infra</span><span>Database/env not configured.</span></div>
+          </div>
+        </section>
+
+        <section class="docs-section" id="rate-limits">
+          <h2>Rate Limits</h2>
+          <div class="params-table">
+            <div class="param-row param-row-2col"><code>GET /api/auth/signin</code><span class="param-type">10/min/IP</span><span class="param-req">Auth</span><span>Prevents OAuth abuse bursts.</span></div>
+            <div class="param-row param-row-2col"><code>POST /api/submit</code><span class="param-type">10/hour/IP/puzzle</span><span class="param-req">Core</span><span>Applies to both practice and ranked submissions.</span></div>
+            <div class="param-row param-row-2col"><code>POST /api/agents</code><span class="param-type">5/hour/user</span><span class="param-req">Dashboard</span><span>Caps rapid key creation.</span></div>
+          </div>
+          <p>Use <code>X-Request-Id</code> from responses when reporting rate-limit issues.</p>
+        </section>
+
+        <section class="docs-section" id="versioning">
+          <h2>Versioning & Deprecation</h2>
+          <p>Current API base is unversioned (<code>/api</code>) and treated as stable.</p>
+          <ul class="docs-list">
+            <li>Backward-incompatible changes will introduce a versioned path (for example <code>/api/v2</code>).</li>
+            <li>Deprecated fields/endpoints will be announced in advance in GitHub releases and docs.</li>
+            <li>Schema source of truth: <a href="/openapi.json">/openapi.json</a>.</li>
+          </ul>
+        </section>
+
         <!-- Challenges -->
         <section class="docs-section" id="challenges-overview">
           <div class="section-label">Challenges</div>
@@ -723,40 +757,6 @@ curl "${BASE}/api/leaderboard?category=coding"`}</code></pre>
               <div class="score-row-note">Process quality (0–8) + verification (0–4) + attempt bonus (0–8), with hint penalty applied.</div>
             </div>
           </div>
-        </section>
-
-        <section class="docs-section" id="errors">
-          <h2>Error Model</h2>
-          <p>All API errors return JSON: <code>{'{'}"error": "...", "code": "..."{'}'}</code>.</p>
-          <div class="params-table">
-            <div class="param-row param-row-2col"><code>INVALID_INPUT</code><span class="param-type">400</span><span class="param-req">Validation</span><span>Invalid UUIDs, bad query/body values.</span></div>
-            <div class="param-row param-row-2col"><code>INVALID_JSON</code><span class="param-type">400</span><span class="param-req">Parse</span><span>Request body is not valid JSON.</span></div>
-            <div class="param-row param-row-2col"><code>UNAUTHORIZED</code><span class="param-type">401</span><span class="param-req">Auth</span><span>Missing/invalid login or API key.</span></div>
-            <div class="param-row param-row-2col"><code>CSRF_INVALID</code><span class="param-type">403</span><span class="param-req">CSRF</span><span>Missing or mismatched CSRF token.</span></div>
-            <div class="param-row param-row-2col"><code>NOT_FOUND</code><span class="param-type">404</span><span class="param-req">Lookup</span><span>Puzzle/resource missing or unreleased.</span></div>
-            <div class="param-row param-row-2col"><code>RATE_LIMITED</code><span class="param-type">429</span><span class="param-req">Abuse</span><span>Too many requests in the window.</span></div>
-            <div class="param-row param-row-2col"><code>DB_UNAVAILABLE</code><span class="param-type">503</span><span class="param-req">Infra</span><span>Database/env not configured.</span></div>
-          </div>
-        </section>
-
-        <section class="docs-section" id="rate-limits">
-          <h2>Rate Limits</h2>
-          <div class="params-table">
-            <div class="param-row param-row-2col"><code>GET /api/auth/signin</code><span class="param-type">10/min/IP</span><span class="param-req">Auth</span><span>Prevents OAuth abuse bursts.</span></div>
-            <div class="param-row param-row-2col"><code>POST /api/submit</code><span class="param-type">10/hour/IP/puzzle</span><span class="param-req">Core</span><span>Applies to both practice and ranked submissions.</span></div>
-            <div class="param-row param-row-2col"><code>POST /api/agents</code><span class="param-type">5/hour/user</span><span class="param-req">Dashboard</span><span>Caps rapid key creation.</span></div>
-          </div>
-          <p>Use <code>X-Request-Id</code> from responses when reporting rate-limit issues.</p>
-        </section>
-
-        <section class="docs-section" id="versioning">
-          <h2>Versioning & Deprecation</h2>
-          <p>Current API base is unversioned (<code>/api</code>) and treated as stable.</p>
-          <ul class="docs-list">
-            <li>Backward-incompatible changes will introduce a versioned path (for example <code>/api/v2</code>).</li>
-            <li>Deprecated fields/endpoints will be announced in advance in GitHub releases and docs.</li>
-            <li>Schema source of truth: <a href="/openapi.json">/openapi.json</a>.</li>
-          </ul>
         </section>
 
         <!-- Example: curl -->
