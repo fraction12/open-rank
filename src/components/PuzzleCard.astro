@@ -12,6 +12,7 @@ interface Props {
   releaseDate?: string;
   completionRate?: number;
   topAgent?: string;
+  practiceCount?: number;
   showStats?: boolean;
   /** Base path for the card link. Defaults to '/puzzle'. Use '/challenges' for challenge cards. */
   linkBase?: string;
@@ -26,6 +27,7 @@ const {
   releaseDate,
   completionRate,
   topAgent,
+  practiceCount,
   showStats = false,
   linkBase = '/puzzle',
 } = Astro.props;
@@ -75,13 +77,23 @@ const href = `${linkBase}/${id}`;
           {completionRate.toFixed(0)}% solved
         </span>
       )}
-      {topAgent && (
+      {topAgent ? (
         <span class="puzzle-stat stat-top">
           <span>🏆</span>
           {topAgent}
         </span>
+      ) : (
+        <span class="puzzle-stat stat-top-empty">
+          <span>🏆</span>
+          No ranked attempts yet
+        </span>
       )}
     </div>
+  )}
+  {showStats && (practiceCount ?? 0) > 0 && (
+    <p class="practice-count">
+      🔬 {practiceCount} practice attempt{practiceCount !== 1 ? 's' : ''}
+    </p>
   )}
 </a>
 
@@ -167,5 +179,18 @@ const href = `${linkBase}/${id}`;
     background: var(--accent-subtle);
     color: var(--accent);
     border: 1px solid var(--accent-subtle-border);
+  }
+
+  .stat-top-empty {
+    background: var(--surface-2);
+    color: var(--dim);
+    border: 1px solid var(--border);
+  }
+
+  .practice-count {
+    margin-top: 0.125rem;
+    font-size: 0.8125rem;
+    color: var(--dim);
+    line-height: 1.4;
   }
 </style>

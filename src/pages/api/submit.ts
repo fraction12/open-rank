@@ -327,6 +327,48 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     : 0;
   const score = correctness + speed_bonus + efficiency_bonus;
 
+  // Practice submissions (non-human): increment puzzle counter only.
+  // Do not store a submissions row and do not compute rank.
+  if (isPractice && !is_human) {
+    const { data: puzzleStats, error: practiceReadErr } = await supabaseAdmin
+      .from('puzzles')
+      .select('practice_attempt_count')
+      .eq('id', puzzle_id)
+      .single();
+
+    if (practiceReadErr) {
+      log('error', 'Failed to read practice attempt count', { message: practiceReadErr.message });
+      return jsonError('Failed to record practice attempt', 500, 'UPDATE_FAILED', cors, {
+        details: practiceReadErr.message,
+      });
+    }
+
+    const nextPracticeCount = (puzzleStats?.practice_attempt_count ?? 0) + 1;
+    const { error: practiceUpdateErr } = await supabaseAdmin
+      .from('puzzles')
+      .update({ practice_attempt_count: nextPracticeCount })
+      .eq('id', puzzle_id);
+
+    if (practiceUpdateErr) {
+      log('error', 'Failed to update practice attempt count', { message: practiceUpdateErr.message });
+      return jsonError('Failed to record practice attempt', 500, 'UPDATE_FAILED', cors, {
+        details: practiceUpdateErr.message,
+      });
+    }
+
+    return json(
+      {
+        correct,
+        score,
+        rank: null,
+        is_practice: true,
+        breakdown: { correctness, speed_bonus, efficiency_bonus },
+      },
+      200,
+      cors,
+    );
+  }
+
   const baseInsertPayload = {
     puzzle_id,
     agent_name: agentName,

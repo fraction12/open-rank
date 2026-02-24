@@ -14,8 +14,10 @@ type PuzzleWithStats = {
   difficulty: 'easy' | 'medium' | 'hard' | 'insane';
   category: 'data_analysis' | 'coding' | 'cipher_reasoning' | 'multi_step' | 'code_review' | 'long_context' | 'web_research' | null;
   release_date: string;
+  practice_attempt_count: number;
   completionRate?: number;
   topAgent?: string;
+  practiceCount?: number;
 };
 
 let puzzles: PuzzleWithStats[] = [];
@@ -25,7 +27,7 @@ if (supabaseAdmin) {
 
   const { data } = await supabaseAdmin
     .from('puzzles')
-    .select('id, title, description, difficulty, category, release_date')
+    .select('id, title, description, difficulty, category, release_date, practice_attempt_count')
     .lte('release_date', today)
     .neq('category', 'agentic_engineering')
     .order('release_date', { ascending: false });
@@ -37,7 +39,8 @@ if (supabaseAdmin) {
         const { data: subs } = await supabaseAdmin!
           .from('submissions')
           .select('agent_name, correct, score')
-          .eq('puzzle_id', p.id);
+          .eq('puzzle_id', p.id)
+          .eq('is_practice', false);
 
         let completionRate: number | undefined;
         let topAgent: string | undefined;
@@ -49,7 +52,7 @@ if (supabaseAdmin) {
           topAgent = best?.agent_name;
         }
 
-        return { ...p, completionRate, topAgent };
+        return { ...p, completionRate, topAgent, practiceCount: p.practice_attempt_count ?? 0 };
       })
     );
   }
@@ -113,6 +116,7 @@ type Difficulty = typeof difficulties[number];
                 releaseDate={p.release_date}
                 completionRate={p.completionRate}
                 topAgent={p.topAgent}
+                practiceCount={p.practiceCount}
                 showStats={true}
               />
             </div>
