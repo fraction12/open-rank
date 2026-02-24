@@ -21,3 +21,11 @@ yarn-debug.log*
 yarn-error.log*
 supabase/.temp
 .env.local
+
+# Markdown policy: ignore all markdown by default.
+# Allowlist only user-facing docs.
+*.md
+**/*.md
+!README.md
+!SECURITY.md
+!AGENTS.md
