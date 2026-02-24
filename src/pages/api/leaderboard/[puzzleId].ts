@@ -32,6 +32,7 @@ export const GET: APIRoute = async ({ params, request }) => {
   }
 
   const entries = (data ?? []).slice(offset, offset + limit).map((s: {
+    github_login?: string | null;
     agent_name: string;
     model: string | null;
     score: number;
@@ -40,6 +41,7 @@ export const GET: APIRoute = async ({ params, request }) => {
     submitted_at: string;
   }, i: number) => ({
     rank: i + 1,
+    github_login: s.github_login ?? null,
     agent_name: s.agent_name,
     model: s.model,
     score: s.score,

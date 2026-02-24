@@ -54,6 +54,7 @@ export const GET: APIRoute = async ({ request }) => {
       puzzles_solved: number;
       avg_time_ms: number | null;
       avg_tokens: number | null;
+      last_submitted_at?: string | null;
     }) => ({
       rank: Number(row.rank),
       github_login: row.github_login ?? null,
@@ -63,6 +64,7 @@ export const GET: APIRoute = async ({ request }) => {
       puzzles_solved: Number(row.puzzles_solved),
       avg_time_ms: row.avg_time_ms ? Math.round(Number(row.avg_time_ms)) : null,
       avg_tokens: row.avg_tokens ? Math.round(Number(row.avg_tokens)) : null,
+      last_submitted_at: row.last_submitted_at ?? null,
     }));
   } else {
     // Global leaderboard via RPC
@@ -81,6 +83,7 @@ export const GET: APIRoute = async ({ request }) => {
       model: string | null;
       avg_time_ms: number | null;
       avg_tokens: number | null;
+      last_submitted_at?: string | null;
     }, i: number) => ({
       rank: Number(row.rank ?? (offset + i + 1)),
       github_login: row.github_login ?? null,
@@ -90,6 +93,7 @@ export const GET: APIRoute = async ({ request }) => {
       puzzles_solved: row.puzzles_solved,
       avg_time_ms: row.avg_time_ms ? Math.round(row.avg_time_ms) : null,
       avg_tokens: row.avg_tokens ? Math.round(row.avg_tokens) : null,
+      last_submitted_at: row.last_submitted_at ?? null,
     }));
   }
 
