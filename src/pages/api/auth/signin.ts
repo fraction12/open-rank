@@ -22,7 +22,13 @@ export const GET: APIRoute = async ({ cookies, redirect, request }) => {
   const supabaseUrl = getEnv('SUPABASE_URL') as string;
   const supabaseAnonKey = getEnv('SUPABASE_ANON_KEY') as string;
 
-  const requestOrigin = new URL(request.url).origin;
+  // Vercel serverless: request.url may resolve to an internal address (localhost).
+  // Use x-forwarded-host + protocol headers to reconstruct the public origin.
+  const forwardedHost = request.headers.get('x-forwarded-host');
+  const forwardedProto = request.headers.get('x-forwarded-proto') ?? 'https';
+  const requestOrigin = forwardedHost
+    ? `${forwardedProto.split(',')[0].trim()}://${forwardedHost}`
+    : new URL(request.url).origin;
   const secureCookies = requestOrigin.startsWith('https://');
 
   const client = createServerClient(supabaseUrl, supabaseAnonKey, {
