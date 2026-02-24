@@ -149,15 +149,27 @@ if (supabaseAdmin) {
 </Layout>
 
 <script>
+  import { noticeFromResponse } from '../lib/http-error';
+  import { normalizeNotice, showNotice } from '../lib/notify';
+  import { toastInfo, toastSuccess } from '../lib/toast';
+
   const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content ?? '';
 
   // ── Sign out ───────────────────────────────────────────────────────────────
   document.getElementById('signout-btn')?.addEventListener('click', async () => {
-    await fetch('/api/auth/signout', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
-    });
-    window.location.href = '/';
+    try {
+      const res = await fetch('/api/auth/signout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+      });
+      if (!res.ok) {
+        throw await noticeFromResponse(res, 'Failed to sign out. Please try again.');
+      }
+      toastInfo('Signed out', 'You have been signed out successfully.');
+      window.location.href = '/';
+    } catch (error) {
+      showNotice(normalizeNotice(error, 'Failed to sign out. Please try again.'));
+    }
   });
 
   // ── Copy API key ───────────────────────────────────────────────────────────
@@ -166,6 +178,7 @@ if (supabaseAdmin) {
       const key = (btn as HTMLElement).dataset.key ?? '';
       try {
         await navigator.clipboard.writeText(key);
+        toastSuccess('Copied', 'API key copied to clipboard.');
         const orig = btn.textContent;
         btn.textContent = 'Copied!';
         setTimeout(() => { btn.textContent = orig; }, 1500);
@@ -177,6 +190,7 @@ if (supabaseAdmin) {
         el.select();
         document.execCommand('copy');
         document.body.removeChild(el);
+        toastSuccess('Copied', 'API key copied to clipboard.');
         btn.textContent = 'Copied!';
         setTimeout(() => { (btn as HTMLElement).textContent = 'Copy'; }, 1500);
       }
@@ -198,8 +212,9 @@ if (supabaseAdmin) {
         // Remove the row from the table
         const row = document.querySelector(`tr[data-agent-id="${agentId}"]`);
         row?.remove();
+        toastSuccess('Agent deleted', `Removed "${agentName}" from your account.`);
       } else {
-        alert('Failed to delete agent. Please try again.');
+        showNotice(await noticeFromResponse(res, 'Failed to delete agent. Please try again.'));
       }
     });
   });
@@ -215,18 +230,28 @@ if (supabaseAdmin) {
     const name = nameInput.value.trim();
     if (!name) return;
 
-    const res = await fetch('/api/agents', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
-      body: JSON.stringify({ name }),
-    });
+    try {
+      const res = await fetch('/api/agents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+        body: JSON.stringify({ name }),
+      });
 
-    if (res.ok || res.status === 201) {
-      // Reload to show the new agent
-      window.location.reload();
-    } else {
-      const body = await res.json().catch(() => ({ error: 'Failed to create agent' }));
-      addError.textContent = body.error ?? 'Failed to create agent';
+      if (res.ok || res.status === 201) {
+        toastSuccess('Agent created', `"${name}" is ready to use.`);
+        // Reload to show the new agent
+        window.location.reload();
+        return;
+      }
+
+      const notice = await noticeFromResponse(res, 'Failed to create agent');
+      showNotice(notice);
+      addError.textContent = notice.message;
+      addError.style.display = 'block';
+    } catch (error) {
+      const notice = normalizeNotice(error, 'Failed to create agent');
+      showNotice(notice);
+      addError.textContent = notice.message;
       addError.style.display = 'block';
     }
   });

@@ -216,6 +216,10 @@ const CATEGORY_TABS = [
 </Layout>
 
 <script>
+  import { noticeFromResponse } from '../lib/http-error';
+  import { normalizeNotice, showNotice } from '../lib/notify';
+  import { toastInfo } from '../lib/toast';
+
   // Category filter tabs — vanilla JS fetch + re-render
   const catBar = document.getElementById('category-bar');
   if (catBar) {
@@ -307,6 +311,10 @@ const CATEGORY_TABS = [
             ? `/api/leaderboard?category=${encodeURIComponent(category)}`
             : '/api/leaderboard';
           const res = await fetch(url);
+          if (!res.ok) {
+            const notice = await noticeFromResponse(res, 'Failed to load leaderboard.');
+            throw notice;
+          }
           const json = await res.json();
           const entries: LeaderEntry[] = json.entries ?? [];
 
@@ -314,8 +322,13 @@ const CATEGORY_TABS = [
             countEl.textContent = `${entries.length} agents ranked`;
           }
 
+          if (entries.length === 0 && category) {
+            toastInfo('No entries yet', 'No ranked agents found for this category yet.');
+          }
+
           board.innerHTML = renderTable(entries);
-        } catch {
+        } catch (error) {
+          showNotice(normalizeNotice(error, 'Failed to load leaderboard.'));
           board.innerHTML = '<div class="empty-state"><span class="empty-icon">⚠️</span><h3>Failed to load</h3><p>Please try again.</p></div>';
         }
       });
@@ -415,11 +428,19 @@ const CATEGORY_TABS = [
       if (!board) return;
       try {
         const res = await fetch('/api/leaderboard/humans');
+        if (!res.ok) {
+          const notice = await noticeFromResponse(res, 'Failed to load human leaderboard.');
+          throw notice;
+        }
         const json = await res.json();
         const entries: HumanEntry[] = json.entries ?? [];
         if (countEl) countEl.textContent = `${entries.length} humans ranked`;
+        if (entries.length === 0) {
+          toastInfo('No human rankings yet', 'Be the first to complete a challenge and claim the top spot.');
+        }
         board.innerHTML = renderHumansTable(entries);
-      } catch {
+      } catch (error) {
+        showNotice(normalizeNotice(error, 'Failed to load human leaderboard.'));
         board.innerHTML = '<div class="empty-state"><span class="empty-icon">⚠️</span><h3>Failed to load</h3><p>Please try again.</p></div>';
       }
     }

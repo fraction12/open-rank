@@ -1,0 +1,171 @@
+<div class="toast-region" aria-live="polite" aria-atomic="false" data-toast-region></div>
+
+<script>
+  import { TOAST_EVENT } from '../lib/toast';
+  import type { ToastDetail, ToastType } from '../lib/toast';
+
+  const region = document.querySelector('[data-toast-region]') as HTMLElement | null;
+
+  if (region) {
+    const active = new Map<string, { el: HTMLElement; timer: ReturnType<typeof setTimeout> | null }>();
+
+    function toastRole(type: ToastType): 'alert' | 'status' {
+      return type === 'error' || type === 'warning' ? 'alert' : 'status';
+    }
+
+    function dismissToast(id: string): void {
+      const item = active.get(id);
+      if (!item) return;
+
+      if (item.timer) clearTimeout(item.timer);
+      item.el.classList.add('toast-exit');
+      setTimeout(() => {
+        item.el.remove();
+      }, 180);
+
+      active.delete(id);
+    }
+
+    function trimQueue(max = 5): void {
+      if (active.size <= max) return;
+      const oldestId = active.keys().next().value;
+      if (oldestId) dismissToast(oldestId);
+    }
+
+    function pushToast(detail: ToastDetail): void {
+      const toast = document.createElement('article');
+      toast.className = `toast toast-${detail.type}`;
+      toast.setAttribute('role', toastRole(detail.type));
+      toast.setAttribute('aria-live', detail.type === 'error' ? 'assertive' : 'polite');
+
+      const body = document.createElement('div');
+      body.className = 'toast-body';
+
+      const title = document.createElement('p');
+      title.className = 'toast-title';
+      title.textContent = detail.title;
+
+      const msg = document.createElement('p');
+      msg.className = 'toast-message';
+      msg.textContent = detail.message;
+
+      body.appendChild(title);
+      body.appendChild(msg);
+      toast.appendChild(body);
+
+      if (detail.dismissible) {
+        const close = document.createElement('button');
+        close.className = 'toast-close';
+        close.type = 'button';
+        close.setAttribute('aria-label', 'Dismiss notification');
+        close.textContent = '×';
+        close.addEventListener('click', () => dismissToast(detail.id));
+        toast.appendChild(close);
+      }
+
+      region.appendChild(toast);
+      trimQueue();
+
+      const timer = detail.durationMs > 0 ? setTimeout(() => dismissToast(detail.id), detail.durationMs) : null;
+      active.set(detail.id, { el: toast, timer });
+    }
+
+    window.addEventListener(TOAST_EVENT, (event) => {
+      const customEvent = event as CustomEvent<ToastDetail>;
+      if (!customEvent.detail) return;
+      pushToast(customEvent.detail);
+    });
+  }
+</script>
+
+<style>
+  .toast-region {
+    position: fixed;
+    top: calc(var(--nav-height) + 0.75rem);
+    right: 1rem;
+    z-index: 250;
+    display: flex;
+    flex-direction: column;
+    gap: 0.625rem;
+    width: min(380px, calc(100vw - 2rem));
+    pointer-events: none;
+  }
+
+  .toast {
+    pointer-events: auto;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    background: var(--bg);
+    box-shadow: var(--shadow-lg);
+    padding: 0.75rem 0.875rem;
+    animation: fadeSlideUp 0.2s ease;
+  }
+
+  .toast-exit {
+    opacity: 0;
+    transform: translateY(-4px);
+    transition: opacity 0.18s ease, transform 0.18s ease;
+  }
+
+  .toast-body {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .toast-title {
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 0.15rem;
+    line-height: 1.3;
+  }
+
+  .toast-message {
+    font-size: 0.84rem;
+    color: var(--dim);
+    line-height: 1.45;
+  }
+
+  .toast-close {
+    border: 0;
+    background: transparent;
+    color: var(--dim);
+    font-size: 1rem;
+    line-height: 1;
+    padding: 0.125rem;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+
+  .toast-error {
+    border-color: var(--error-subtle-border);
+    background: var(--error-subtle);
+  }
+
+  .toast-warning {
+    border-color: var(--warning-vivid-border);
+    background: #fffbeb;
+  }
+
+  .toast-info {
+    border-color: var(--accent-subtle-border);
+    background: var(--accent-subtle);
+  }
+
+  .toast-success {
+    border-color: var(--success-subtle-border);
+    background: var(--success-subtle);
+  }
+
+  @media (max-width: 768px) {
+    .toast-region {
+      left: 1rem;
+      right: 1rem;
+      top: calc(var(--nav-height) + 0.6rem);
+      width: auto;
+    }
+  }
+</style>

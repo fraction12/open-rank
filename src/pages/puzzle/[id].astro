@@ -464,6 +464,10 @@ const curlPractice = `curl -X POST https://open-rank.com/api/submit \\
 </Layout>
 
 <script>
+  import { noticeFromResponse } from '../../lib/http-error';
+  import { normalizeNotice, showNotice } from '../../lib/notify';
+  import { toastInfo, toastSuccess } from '../../lib/toast';
+
   const csrfToken = (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null)?.content ?? '';
   const form = document.getElementById('submit-form') as HTMLFormElement;
   const btn = document.getElementById('submit-btn') as HTMLButtonElement;
@@ -501,6 +505,10 @@ const curlPractice = `curl -X POST https://open-rank.com/api/submit \\
         headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
         body: JSON.stringify(body),
       });
+      if (!res.ok) {
+        const notice = await noticeFromResponse(res, 'Submission failed.');
+        showNotice(notice);
+      }
       const json = await res.json();
 
       if (res.ok) {
@@ -518,11 +526,17 @@ const curlPractice = `curl -X POST https://open-rank.com/api/submit \\
               ${rankText}
             </div>
           </div>`;
+        if (json.correct) {
+          toastSuccess('Submission accepted', `Score ${json.score}/100.`);
+        } else {
+          toastInfo('Incorrect answer', 'Try again with a different approach.');
+        }
         if (json.correct) form.reset();
       } else {
         resultEl.innerHTML = `<div class="alert alert-error pop-in"><span>⚠️</span><div>${json.error ?? 'Submission failed.'}</div></div>`;
       }
-    } catch {
+    } catch (error) {
+      showNotice(normalizeNotice(error, 'Network error. Please try again.'));
       resultEl.innerHTML = `<div class="alert alert-error pop-in"><span>⚠️</span><div>Network error. Please try again.</div></div>`;
     } finally {
       btn.disabled = false;
@@ -555,6 +569,7 @@ const curlPractice = `curl -X POST https://open-rank.com/api/submit \\
 
       if (!startRes.ok) {
         const err = await startRes.json().catch(() => ({}));
+        showNotice(await noticeFromResponse(startRes, err.error ?? 'Failed to start challenge. Are you signed in?'));
         humanResult!.textContent = err.error ?? 'Failed to start challenge. Are you signed in?';
         humanBtn.textContent = 'Start & Submit Challenge';
         humanBtn.removeAttribute('disabled');
@@ -570,15 +585,21 @@ const curlPractice = `curl -X POST https://open-rank.com/api/submit \\
         body: JSON.stringify({ puzzle_id: puzzleId, answer, session_id, ai_tool, is_human: true }),
       });
       const result = await submitRes.json();
+      if (!submitRes.ok) {
+        showNotice(await noticeFromResponse(submitRes, result.error ?? 'Submission failed. Try again.'));
+      }
 
       if (result.correct) {
+        toastSuccess('Challenge solved', `Score ${result.score}/100.`);
         humanResult!.innerHTML = `✅ Correct! Score: <strong>${result.score}</strong>/100 · Speed: ${result.breakdown?.speed_bonus ?? 0}pts · Efficiency: ${result.breakdown?.efficiency_bonus ?? 0}pts`;
       } else {
+        toastInfo('Incorrect answer', 'Try again. Attempt bonus decreases after wrong submissions.');
         humanResult!.innerHTML = `❌ Incorrect. Try again — but each wrong attempt reduces your efficiency bonus.`;
         humanBtn.textContent = 'Try Again';
         humanBtn.removeAttribute('disabled');
       }
-    } catch {
+    } catch (error) {
+      showNotice(normalizeNotice(error, 'Submission failed. Try again.'));
       humanResult!.textContent = 'Submission failed. Try again.';
       humanBtn.textContent = 'Start & Submit Challenge';
       humanBtn.removeAttribute('disabled');

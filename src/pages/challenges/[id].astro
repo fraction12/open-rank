@@ -307,6 +307,10 @@ const displayData = isTruncated ? inputData.slice(0, INPUT_DISPLAY_LIMIT) : inpu
 </Layout>
 
 <script define:vars={{ puzzleId: puzzle.id, isLoggedIn: !!currentUser }}>
+  import { noticeFromResponse } from '../../lib/http-error';
+  import { normalizeNotice, showNotice } from '../../lib/notify';
+  import { toastInfo, toastSuccess, toastWarning } from '../../lib/toast';
+
   const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content ?? '';
 
   // ── Copy input data ──────────────────────────────────────────────────────
@@ -315,8 +319,10 @@ const displayData = isTruncated ? inputData.slice(0, INPUT_DISPLAY_LIMIT) : inpu
     const btn = document.getElementById('copy-input-btn');
     try {
       await navigator.clipboard.writeText(text);
+      toastSuccess('Copied', 'Challenge input copied to clipboard.');
       if (btn) { btn.textContent = 'Copied!'; setTimeout(() => { if (btn) btn.textContent = 'Copy'; }, 2000); }
     } catch {
+      toastWarning('Copy failed', 'Unable to copy automatically. You can copy manually.');
       if (btn) { btn.textContent = 'Copy failed'; setTimeout(() => { if (btn) btn.textContent = 'Copy'; }, 2000); }
     }
   });
@@ -374,11 +380,8 @@ const displayData = isTruncated ? inputData.slice(0, INPUT_DISPLAY_LIMIT) : inpu
         headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
         body: JSON.stringify({ puzzle_id: puzzleId }),
       });
-      console.log('start-challenge status:', res.status, 'csrf:', csrfToken);
       if (!res.ok) {
-        const body = await res.text();
-        console.log('start-challenge error body:', body);
-        throw new Error(`Server error: ${res.status}`);
+        throw await noticeFromResponse(res, 'Failed to start challenge. Please refresh and try again.');
       }
       const data = await res.json();
       if (!data.session_id) {
@@ -404,7 +407,7 @@ const displayData = isTruncated ? inputData.slice(0, INPUT_DISPLAY_LIMIT) : inpu
         variantEl.style.display = 'block';
       }
     } catch (err) {
-      console.error('Failed to start challenge:', err);
+      showNotice(normalizeNotice(err, 'Failed to start challenge. Please refresh and try again.'));
       startBtn.textContent = '▶ Start Challenge';
       startBtn.disabled = false;
       const errorEl = document.createElement('p');
@@ -483,6 +486,7 @@ const displayData = isTruncated ? inputData.slice(0, INPUT_DISPLAY_LIMIT) : inpu
       const result = await res.json();
 
       if (!res.ok) {
+        showNotice(await noticeFromResponse(res, result.error ?? 'Submission failed. Please try again.'));
         resultEl.innerHTML = `<span class="result-error">⚠️ ${result.error ?? 'Submission failed. Please try again.'}</span>`;
         submitBtn.textContent = 'Submit Answer';
         submitBtn.disabled = false;
@@ -514,6 +518,7 @@ const displayData = isTruncated ? inputData.slice(0, INPUT_DISPLAY_LIMIT) : inpu
           `<span class="score-pill-sm">🧪 ${hr.verification_bonus ?? 0}pts verification</span>`,
           `<span class="score-pill-sm">🎯 ${hr.attempt_bonus ?? 0}pts attempt</span>`,
         ].join('');
+        toastSuccess('Challenge solved', `Score ${result.score}/100.`);
       } else {
         const nextAttempt = attemptCount + 1;
         document.getElementById('attempt-count').textContent = String(nextAttempt);
@@ -525,11 +530,13 @@ const displayData = isTruncated ? inputData.slice(0, INPUT_DISPLAY_LIMIT) : inpu
           hintEl.textContent = 'No attempt bonus remaining';
         }
         resultEl.innerHTML = '❌ Incorrect — try again.';
+        toastInfo('Incorrect answer', 'Keep going. You can submit again.');
         submitBtn.textContent = 'Submit Answer';
         submitBtn.disabled = false;
       }
     } catch (err) {
       // Network / unexpected error — show visible message, re-enable submit
+      showNotice(normalizeNotice(err, 'Network error. Please check your connection and try again.'));
       resultEl.innerHTML = '<span class="result-error">⚠️ Network error. Please check your connection and try again.</span>';
       submitBtn.textContent = 'Submit Answer';
       submitBtn.disabled = false;

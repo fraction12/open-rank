@@ -1,6 +1,7 @@
 ---
 import Nav from '../components/Nav.astro';
 import Footer from '../components/Footer.astro';
+import ToastHost from '../components/ToastHost.astro';
 import '../styles/global.css';
 import '../styles/animations.css';
 import { getCurrentUser } from '../lib/supabase';
@@ -77,6 +78,7 @@ const csrfToken = ensureCsrfCookie(Astro.cookies, Astro.url);
     <main id="main-content">
       <slot />
     </main>
+    <ToastHost />
     <Footer />
     <script>
       // Scroll-reveal observer
