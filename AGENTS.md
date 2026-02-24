@@ -46,6 +46,19 @@
 - Required runtime envs include: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `ANSWER_SALT`.
 - For cookie-authenticated write endpoints, include CSRF token (`X-CSRF-Token` or `csrf_token` form field).
 
+## Astro Component Rules (critical — read before touching any component)
+
+### Scoped styles DO NOT apply to dynamically created elements
+- Astro scopes `<style>` blocks in `.astro` components by adding a unique attribute (e.g. `data-astro-cid-xxx`) to static template elements only.
+- **Any element created via `document.createElement()` at runtime will NOT receive the scoped attribute** — the styles will silently not apply.
+- **Rule:** If a component creates DOM elements dynamically in a `<script>` block, its styles MUST go in `src/styles/global.css`, not in a `<style>` block inside the component.
+- This applies to: ToastHost, any modal/dialog, dropdown menus, or any JS-driven UI.
+
+### ToastHost specifically
+- Toast styles live in `src/styles/global.css` under `/* ── Toast notifications ── */`.
+- Do not add a `<style>` block to `ToastHost.astro` — it will not work.
+- The `#toast-region` div must be placed **after** `<Footer />` in `Layout.astro` so it renders at body level and isn't clipped by parent overflow.
+
 ## Design System Rules (critical — never hardcode colours or spacing)
 
 - **All colours must use CSS variables** from `src/styles/global.css`. Never use hardcoded hex values (`#fee2e2`, `#b91c1c`, `#dbeafe` etc.) anywhere in components or styles.
