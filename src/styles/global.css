@@ -33,6 +33,11 @@
   --success-subtle: #f0fdf4;
   --success-subtle-border: #a7f3d0;
 
+  /* Warning */
+  --warning: #d97706;
+  --warning-subtle: #fffbeb;
+  --warning-subtle-border: #fcd34d;
+
   /* Error */
   --error: #ef4444;
   --error-subtle: #fef2f2;
