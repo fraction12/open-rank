@@ -46,12 +46,9 @@ if (supabaseAdmin) {
           Member since {new Date(user.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
         </p>
       </div>
-      <form action="/api/auth/signout" method="POST">
-        <input type="hidden" name="csrf_token" value={csrfToken} />
-        <button type="submit" class="btn" style="font-size: 0.875rem; padding: 0.4rem 0.875rem; border: 1px solid var(--border); background: var(--surface); color: var(--dim); border-radius: var(--radius-sm); cursor: pointer;">
-          Sign out
-        </button>
-      </form>
+      <button id="signout-btn" class="btn" style="font-size: 0.875rem; padding: 0.4rem 0.875rem; border: 1px solid var(--border); background: var(--surface); color: var(--dim); border-radius: var(--radius-sm); cursor: pointer;">
+        Sign out
+      </button>
     </div>
 
     <!-- ── Agents section ─────────────────────────────────────────────────── -->
@@ -157,6 +154,15 @@ if (supabaseAdmin) {
 
 <script>
   const csrfToken = (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null)?.content ?? '';
+
+  // ── Sign out ───────────────────────────────────────────────────────────────
+  document.getElementById('signout-btn')?.addEventListener('click', async () => {
+    await fetch('/api/auth/signout', {
+      method: 'POST',
+      headers: { 'X-CSRF-Token': csrfToken },
+    });
+    window.location.href = '/';
+  });
 
   // ── Copy API key ───────────────────────────────────────────────────────────
   document.querySelectorAll('.copy-btn').forEach(btn => {
