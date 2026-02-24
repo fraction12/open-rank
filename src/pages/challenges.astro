@@ -52,6 +52,8 @@ if (supabaseAdmin) {
     });
   }
 }
+
+const difficulties = ['all', 'medium', 'hard', 'insane'] as const;
 ---
 
 <Layout title="Challenges" description="OpenRank Challenges — Real engineering problems. Use your AI tools. Compete against other humans.">
@@ -116,11 +118,15 @@ if (supabaseAdmin) {
                   autocomplete="off"
                 />
               </div>
-              <div class="difficulty-pills" role="group" aria-label="Filter challenges by difficulty">
-                <button type="button" class="difficulty-pill is-active" data-difficulty="all">All</button>
-                <button type="button" class="difficulty-pill" data-difficulty="medium">Medium</button>
-                <button type="button" class="difficulty-pill" data-difficulty="hard">Hard</button>
-                <button type="button" class="difficulty-pill" data-difficulty="insane">Insane</button>
+              <div class="filter-bar" role="group" aria-label="Filter by difficulty">
+                {difficulties.map(d => (
+                  <button
+                    class:list={['filter-pill', { active: d === 'all' }]}
+                    data-filter={d}
+                  >
+                    {d === 'all' ? 'All' : d.charAt(0).toUpperCase() + d.slice(1)}
+                  </button>
+                ))}
               </div>
             </div>
 
@@ -171,23 +177,24 @@ if (supabaseAdmin) {
 </Layout>
 
 <script>
+  const pills = document.querySelectorAll<HTMLButtonElement>('.filter-pill');
+  const items = document.querySelectorAll<HTMLElement>('.grid-item');
   const searchInput = document.querySelector<HTMLInputElement>('#challenge-search');
-  const items = document.querySelectorAll<HTMLElement>('.challenge-grid .grid-item');
-  const difficultyPills = document.querySelectorAll<HTMLButtonElement>('.difficulty-pill');
   const noResults = document.querySelector<HTMLElement>('#challenge-no-results');
-  let activeDifficulty = 'all';
 
   const applyFilters = () => {
+    const activePill = document.querySelector<HTMLButtonElement>('.filter-pill.active');
+    const filter = activePill?.dataset.filter ?? 'all';
     const query = (searchInput?.value ?? '').trim().toLowerCase();
     let visibleCount = 0;
 
     items.forEach(item => {
+      const diff = item.dataset.difficulty ?? '';
       const title = item.dataset.title ?? '';
       const description = item.dataset.description ?? '';
-      const difficulty = item.dataset.difficulty ?? '';
+      const matchesDifficulty = filter === 'all' || diff === filter;
       const matchesSearch = query === '' || title.includes(query) || description.includes(query);
-      const matchesDifficulty = activeDifficulty === 'all' || difficulty === activeDifficulty;
-      const isVisible = matchesSearch && matchesDifficulty;
+      const isVisible = matchesDifficulty && matchesSearch;
 
       item.style.display = isVisible ? '' : 'none';
       if (isVisible) visibleCount += 1;
@@ -198,10 +205,10 @@ if (supabaseAdmin) {
     }
   };
 
-  difficultyPills.forEach(pill => {
+  pills.forEach(pill => {
     pill.addEventListener('click', () => {
-      activeDifficulty = pill.dataset.difficulty ?? 'all';
-      difficultyPills.forEach(node => node.classList.toggle('is-active', node === pill));
+      pills.forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
       applyFilters();
     });
   });
@@ -241,34 +248,36 @@ if (supabaseAdmin) {
     outline-offset: 2px;
   }
 
-  .difficulty-pills {
+  .filter-bar {
     display: flex;
-    flex-wrap: wrap;
     gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-bottom: 2rem;
   }
 
-  .difficulty-pill {
-    appearance: none;
-    border: 1px solid var(--border);
-    background: var(--surface);
-    color: var(--dim);
-    font-family: inherit;
-    font-size: 0.8125rem;
-    line-height: 1.2;
-    padding: 0.3rem 0.75rem;
+  .filter-pill {
+    padding: 0.4rem 1rem;
     border-radius: 99px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--dim);
+    font-size: 0.875rem;
+    font-weight: 500;
     cursor: pointer;
+    transition: all 0.15s;
+    box-shadow: var(--shadow-sm);
   }
 
-  .difficulty-pill:hover {
-    border-color: var(--border-strong);
-    color: var(--text);
-  }
-
-  .difficulty-pill.is-active {
-    background: var(--accent);
-    color: var(--bg);
+  .filter-pill:hover {
     border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .filter-pill.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+    box-shadow: var(--shadow-accent);
   }
 
   .search-empty {
