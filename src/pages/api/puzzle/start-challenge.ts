@@ -65,15 +65,34 @@ export const POST: APIRoute = async ({ request, cookies }) => {
 
   // ── Check for existing unused session (via supabaseAdmin — RLS locked) ────
   // Prevents farming: if a session exists for this user+puzzle, reuse it
-  const { data: existingSession } = await supabaseAdmin
-    .from('puzzle_sessions')
-    .select('id, variant_id, variant_title')
-    .eq('puzzle_id', puzzle_id)
-    .eq('user_id', currentUser.id)
-    .eq('used', false)
-    .order('started_at', { ascending: false })
-    .limit(1)
-    .single();
+  let existingSession: { id: string; variant_id?: string | null; variant_title?: string | null } | null = null;
+  {
+    const { data, error } = await supabaseAdmin
+      .from('puzzle_sessions')
+      .select('id, variant_id, variant_title')
+      .eq('puzzle_id', puzzle_id)
+      .eq('user_id', currentUser.id)
+      .eq('used', false)
+      .order('started_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (!error) {
+      existingSession = data;
+    } else {
+      // Backward compatibility: migration may not be applied yet.
+      const fallback = await supabaseAdmin
+        .from('puzzle_sessions')
+        .select('id')
+        .eq('puzzle_id', puzzle_id)
+        .eq('user_id', currentUser.id)
+        .eq('used', false)
+        .order('started_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      existingSession = fallback.data ? { id: fallback.data.id } : null;
+    }
+  }
 
   if (existingSession) {
     const variant = selectChallengeVariant(`${puzzle_id}:${currentUser.id}:${existingSession.id}`);
@@ -92,18 +111,42 @@ export const POST: APIRoute = async ({ request, cookies }) => {
   const variant = selectChallengeVariant(`${puzzle_id}:${currentUser.id}:${Date.now()}`);
 
   // ── Create new session (via supabaseAdmin — RLS locked) ───────────────────
-  const { data: newSession, error: insertErr } = await supabaseAdmin
-    .from('puzzle_sessions')
-    .insert({
-      puzzle_id,
-      user_id: currentUser.id,
-      started_at: new Date().toISOString(),
-      used: false,
-      variant_id: variant.id,
-      variant_title: variant.title,
-    })
-    .select('id, variant_id, variant_title')
-    .single();
+  let newSession: { id: string; variant_id?: string | null; variant_title?: string | null } | null = null;
+  let insertErr: { message?: string } | null = null;
+  {
+    const insertWithVariant = await supabaseAdmin
+      .from('puzzle_sessions')
+      .insert({
+        puzzle_id,
+        user_id: currentUser.id,
+        started_at: new Date().toISOString(),
+        used: false,
+        variant_id: variant.id,
+        variant_title: variant.title,
+      })
+      .select('id, variant_id, variant_title')
+      .single();
+
+    if (!insertWithVariant.error && insertWithVariant.data) {
+      newSession = insertWithVariant.data;
+    } else {
+      const fallbackInsert = await supabaseAdmin
+        .from('puzzle_sessions')
+        .insert({
+          puzzle_id,
+          user_id: currentUser.id,
+          started_at: new Date().toISOString(),
+          used: false,
+        })
+        .select('id')
+        .single();
+      if (!fallbackInsert.error && fallbackInsert.data) {
+        newSession = { id: fallbackInsert.data.id };
+      } else {
+        insertErr = { message: fallbackInsert.error?.message || insertWithVariant.error?.message };
+      }
+    }
+  }
 
   if (insertErr || !newSession) {
     log('error', 'Failed to create puzzle session', { message: insertErr?.message });

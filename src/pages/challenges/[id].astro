@@ -479,6 +479,13 @@ const displayData = isTruncated ? inputData.slice(0, INPUT_DISPLAY_LIMIT) : inpu
       });
       const result = await res.json();
 
+      if (!res.ok) {
+        resultEl.innerHTML = `<span class="result-error">⚠️ ${result.error ?? 'Submission failed. Please try again.'}</span>`;
+        submitBtn.textContent = 'Submit Answer';
+        submitBtn.disabled = false;
+        return;
+      }
+
       if (result.correct) {
         if (timerInterval) clearInterval(timerInterval);
         const elapsed = startTimestamp ? Date.now() - startTimestamp : 0;

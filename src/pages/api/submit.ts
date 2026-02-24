@@ -217,23 +217,36 @@ export const POST: APIRoute = async ({ request, cookies }) => {
 
   if (session_id && typeof session_id === 'string') {
     if (is_human && humanUserId) {
-      // Human session: scoped to user_id (not api_key)
-      let sessionQuery = supabaseAdmin
-        .from('puzzle_sessions')
-        .update({ used: true })
-        .eq('id', session_id)
-        .eq('used', false)
-        .eq('puzzle_id', puzzle_id)
-        .eq('user_id', humanUserId)
-        .select('started_at, variant_id');
+      // Human session: scoped to user_id (not api_key).
+      // Keep session reusable across retries; mark it used only after a correct solve.
+      let session: { started_at: string; variant_id?: string | null } | null = null;
+      {
+        const withVariant = await supabaseAdmin
+          .from('puzzle_sessions')
+          .select('started_at, variant_id')
+          .eq('id', session_id)
+          .eq('puzzle_id', puzzle_id)
+          .eq('user_id', humanUserId)
+          .maybeSingle();
 
-      if (variant_id && typeof variant_id === 'string') {
-        sessionQuery = sessionQuery.eq('variant_id', variant_id);
+        if (!withVariant.error) {
+          session = withVariant.data;
+        } else {
+          const fallback = await supabaseAdmin
+            .from('puzzle_sessions')
+            .select('started_at')
+            .eq('id', session_id)
+            .eq('puzzle_id', puzzle_id)
+            .eq('user_id', humanUserId)
+            .maybeSingle();
+          session = fallback.data;
+        }
       }
 
-      const { data: session } = await sessionQuery.single();
-
       if (session) {
+        if (variant_id && session.variant_id && variant_id !== session.variant_id) {
+          return jsonError('Variant mismatch for challenge session', 400, 'INVALID_INPUT', cors);
+        }
         realTimeMs = Date.now() - new Date(session.started_at).getTime();
       }
     } else if (api_key && typeof api_key === 'string') {
@@ -312,40 +325,67 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     : 0;
   const score = correctness + speed_bonus + efficiency_bonus;
 
+  const baseInsertPayload = {
+    puzzle_id,
+    agent_name: agentName,
+    agent_id: agentId,
+    model: model?.trim() ?? null,
+    answer_hash: answerHash,
+    correct,
+    score,
+    time_ms: realTimeMs ?? (isPractice ? selfReportedTimeMs ?? null : null),
+    tokens_used: tokens_used ?? null,
+    is_practice: isPractice,
+    session_id: session_id ?? null,
+    skill_used: (skill_used as string | undefined)?.trim() ?? null,
+    is_human,
+    ai_tool: ai_tool ?? null,
+    attempt_number: is_human ? humanAttemptNumber : null,
+    user_id: is_human ? humanUserId : null,
+  };
+
+  const humanRubricPayload = is_human
+    ? {
+        root_cause: root_cause?.trim() || null,
+        fix_plan: fix_plan?.trim() || null,
+        verification_steps: verification_steps?.trim() || null,
+        confidence_level: confidence_level ?? null,
+        hints_used: hints_used ?? 0,
+        variant_id: variant_id?.trim() ?? null,
+        rubric_attempt_score: humanRubric.attemptScore,
+        rubric_process_score: humanRubric.processScore,
+        rubric_verification_score: humanRubric.verificationScore,
+        rubric_total_score: humanRubric.total,
+      }
+    : {};
+
   // ── Insert submission (via service role — RLS locked down) ────────────────
-  const { data: inserted, error: insErr } = await supabaseAdmin
-    .from('submissions')
-    .insert({
-      puzzle_id,
-      agent_name: agentName,
-      agent_id: agentId,
-      model: model?.trim() ?? null,
-      answer_hash: answerHash,
-      correct,
-      score,
-      time_ms: realTimeMs ?? (isPractice ? selfReportedTimeMs ?? null : null),
-      tokens_used: tokens_used ?? null,
-      is_practice: isPractice,
-      session_id: session_id ?? null,
-      skill_used: (skill_used as string | undefined)?.trim() ?? null,
-      // Human challenge fields
-      is_human: is_human,
-      ai_tool: ai_tool ?? null,
-      attempt_number: is_human ? humanAttemptNumber : null,
-      user_id: is_human ? humanUserId : null,
-      root_cause: is_human ? (root_cause?.trim() || null) : null,
-      fix_plan: is_human ? (fix_plan?.trim() || null) : null,
-      verification_steps: is_human ? (verification_steps?.trim() || null) : null,
-      confidence_level: is_human ? confidence_level ?? null : null,
-      hints_used: is_human ? hints_used ?? 0 : 0,
-      variant_id: is_human ? variant_id?.trim() ?? null : null,
-      rubric_attempt_score: is_human ? humanRubric.attemptScore : 0,
-      rubric_process_score: is_human ? humanRubric.processScore : 0,
-      rubric_verification_score: is_human ? humanRubric.verificationScore : 0,
-      rubric_total_score: is_human ? humanRubric.total : 0,
-    })
-    .select('id')
-    .single();
+  let inserted: { id: string } | null = null;
+  let insErr: { code?: string; message?: string } | null = null;
+  {
+    const primaryInsert = await supabaseAdmin
+      .from('submissions')
+      .insert({ ...baseInsertPayload, ...humanRubricPayload })
+      .select('id')
+      .single();
+
+    if (!primaryInsert.error && primaryInsert.data) {
+      inserted = primaryInsert.data;
+    } else if (is_human) {
+      // Backward compatibility: allow old schema deployments to keep accepting submissions.
+      const fallbackInsert = await supabaseAdmin
+        .from('submissions')
+        .insert(baseInsertPayload)
+        .select('id')
+        .single();
+      inserted = fallbackInsert.data ?? null;
+      insErr = fallbackInsert.error
+        ? { code: fallbackInsert.error.code, message: fallbackInsert.error.message }
+        : null;
+    } else {
+      insErr = primaryInsert.error ? { code: primaryInsert.error.code, message: primaryInsert.error.message } : null;
+    }
+  }
 
   if (insErr || !inserted) {
     if (insErr?.code === '23505' && is_human && humanUserId && correct) {
@@ -365,6 +405,15 @@ export const POST: APIRoute = async ({ request, cookies }) => {
 
     log('error', 'Failed to record submission', { message: insErr?.message });
     return jsonError('Failed to record submission', 500, 'INSERT_FAILED', cors);
+  }
+
+  if (is_human && correct && session_id && humanUserId) {
+    await supabaseAdmin
+      .from('puzzle_sessions')
+      .update({ used: true })
+      .eq('id', session_id)
+      .eq('puzzle_id', puzzle_id)
+      .eq('user_id', humanUserId);
   }
 
   // ── Calculate rank (only among ranked submissions) ────────
