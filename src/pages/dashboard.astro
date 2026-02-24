@@ -154,12 +154,24 @@ if (supabaseAdmin) {
   import { toastInfo, toastSuccess } from '../lib/toast';
 
   const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content ?? '';
+  function setBusyState(button: HTMLButtonElement | null, busyLabel: string): () => void {
+    if (!button) return () => {};
+    const originalLabel = button.textContent ?? '';
+    button.disabled = true;
+    button.setAttribute('aria-busy', 'true');
+    button.textContent = busyLabel;
+    return () => {
+      button.disabled = false;
+      button.removeAttribute('aria-busy');
+      button.textContent = originalLabel;
+    };
+  }
 
   // ── Sign out ───────────────────────────────────────────────────────────────
   document.getElementById('signout-btn')?.addEventListener('click', async () => {
     const signoutBtn = document.getElementById('signout-btn') as HTMLButtonElement | null;
     if (signoutBtn?.disabled) return;
-    if (signoutBtn) signoutBtn.disabled = true;
+    const restoreSignoutBtn = setBusyState(signoutBtn, 'Signing out...');
     try {
       const res = await fetch('/api/auth/signout', {
         method: 'POST',
@@ -172,7 +184,7 @@ if (supabaseAdmin) {
       window.location.href = '/';
     } catch (error) {
       showNotice(normalizeNotice(error, 'Failed to sign out. Please try again.'));
-      if (signoutBtn) signoutBtn.disabled = false;
+      restoreSignoutBtn();
     }
   });
 
@@ -209,7 +221,7 @@ if (supabaseAdmin) {
       const agentId = (btn as HTMLElement).dataset.agentId;
       const agentName = (btn as HTMLElement).dataset.agentName;
       if (!confirm(`Delete agent "${agentName}"? This cannot be undone.`)) return;
-      button.disabled = true;
+      const restoreDeleteBtn = setBusyState(button, 'Deleting...');
 
       const res = await fetch(`/api/agents/${agentId}`, {
         method: 'DELETE',
@@ -222,7 +234,7 @@ if (supabaseAdmin) {
         toastSuccess('Agent deleted', `Removed "${agentName}" from your account.`);
       } else {
         showNotice(await noticeFromResponse(res, 'Failed to delete agent. Please try again.'));
-        button.disabled = false;
+        restoreDeleteBtn();
       }
     });
   });
@@ -239,7 +251,7 @@ if (supabaseAdmin) {
     addError.style.display = 'none';
     const name = nameInput.value.trim();
     if (!name) return;
-    if (submitBtn) submitBtn.disabled = true;
+    const restoreSubmitBtn = setBusyState(submitBtn, 'Creating...');
 
     try {
       const res = await fetch('/api/agents', {
@@ -265,7 +277,7 @@ if (supabaseAdmin) {
       addError.textContent = notice.message;
       addError.style.display = 'block';
     } finally {
-      if (submitBtn) submitBtn.disabled = false;
+      restoreSubmitBtn();
     }
   });
 </script>

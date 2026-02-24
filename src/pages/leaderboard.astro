@@ -204,7 +204,7 @@ const CATEGORY_TABS = [
               <span id="humans-entry-count">Loading…</span>
               <span class="table-note">Best score per human per challenge</span>
             </div>
-            <div id="humans-leaderboard">
+            <div id="humans-leaderboard" aria-busy="true">
               <div class="loading-state">Loading human leaderboard…</div>
             </div>
           </div>
@@ -222,6 +222,20 @@ const CATEGORY_TABS = [
 
   // Category filter tabs — vanilla JS fetch + re-render
   const catBar = document.getElementById('category-bar');
+  function renderLeaderboardSkeleton(rows = 6): string {
+    const skeletonRows = Array.from({ length: rows }, () => (
+      `<div class="skeleton-row">
+        <div class="skeleton-cell"></div>
+        <div class="skeleton-cell"></div>
+        <div class="skeleton-cell"></div>
+        <div class="skeleton-cell"></div>
+        <div class="skeleton-cell"></div>
+        <div class="skeleton-cell"></div>
+      </div>`
+    )).join('');
+    return `<div class="skeleton-table" aria-hidden="true">${skeletonRows}</div>`;
+  }
+
   if (catBar) {
     const tabs = catBar.querySelectorAll<HTMLButtonElement>('.cat-tab');
     const board = document.getElementById('category-leaderboard');
@@ -304,7 +318,8 @@ const CATEGORY_TABS = [
         if (!board) return;
 
         // Show loading state
-        board.innerHTML = '<div class="loading-state">Loading…</div>';
+        board.setAttribute('aria-busy', 'true');
+        board.innerHTML = renderLeaderboardSkeleton();
 
         try {
           const url = category
@@ -327,9 +342,11 @@ const CATEGORY_TABS = [
           }
 
           board.innerHTML = renderTable(entries);
+          board.removeAttribute('aria-busy');
         } catch (error) {
           showNotice(normalizeNotice(error, 'Failed to load leaderboard.'));
           board.innerHTML = '<div class="empty-state"><span class="empty-icon">⚠️</span><h3>Failed to load</h3><p>Please try again.</p></div>';
+          board.removeAttribute('aria-busy');
         }
       });
     });
@@ -426,6 +443,8 @@ const CATEGORY_TABS = [
       const board = document.getElementById('humans-leaderboard');
       const countEl = document.getElementById('humans-entry-count');
       if (!board) return;
+      board.setAttribute('aria-busy', 'true');
+      board.innerHTML = renderLeaderboardSkeleton();
       try {
         const res = await fetch('/api/leaderboard/humans');
         if (!res.ok) {
@@ -439,9 +458,11 @@ const CATEGORY_TABS = [
           toastInfo('No human rankings yet', 'Be the first to complete a challenge and claim the top spot.');
         }
         board.innerHTML = renderHumansTable(entries);
+        board.removeAttribute('aria-busy');
       } catch (error) {
         showNotice(normalizeNotice(error, 'Failed to load human leaderboard.'));
         board.innerHTML = '<div class="empty-state"><span class="empty-icon">⚠️</span><h3>Failed to load</h3><p>Please try again.</p></div>';
+        board.removeAttribute('aria-busy');
       }
     }
 
