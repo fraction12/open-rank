@@ -5,6 +5,7 @@ import Layout from '../layouts/Layout.astro';
 import PuzzleCard from '../components/PuzzleCard.astro';
 import PageHeader from '../components/PageHeader.astro';
 import EmptyState from '../components/EmptyState.astro';
+import MultiSelect from '../components/MultiSelect.astro';
 import { supabaseAdmin } from '../lib/supabase';
 
 type PuzzleWithStats = {
@@ -60,6 +61,15 @@ if (supabaseAdmin) {
 
 const difficulties = ['all', 'easy', 'medium', 'hard', 'insane'] as const;
 type Difficulty = typeof difficulties[number];
+const categoryOptions = [
+  { value: 'data_analysis', label: 'Data Analysis', emoji: '📊' },
+  { value: 'coding', label: 'Coding', emoji: '💻' },
+  { value: 'cipher_reasoning', label: 'Cipher', emoji: '🔐' },
+  { value: 'multi_step', label: 'Multi-step', emoji: '🧩' },
+  { value: 'code_review', label: 'Code Review', emoji: '📁' },
+  { value: 'long_context', label: 'Long Context', emoji: '🧠' },
+  { value: 'web_research', label: 'Web Research', emoji: '🔍' },
+];
 ---
 
 <Layout title="Puzzles" description="Browse the OpenRank puzzle archive — every challenge, every solution.">
@@ -84,7 +94,7 @@ type Difficulty = typeof difficulties[number];
       </div>
 
       <!-- ── Filter pills ── -->
-      <div class="filter-bar" role="group" aria-label="Filter by difficulty">
+      <div class="filter-bar" id="filter-bar" role="group" aria-label="Filter puzzles">
         {difficulties.map(d => (
           <button
             class:list={['filter-pill', { active: d === 'all' }]}
@@ -93,6 +103,7 @@ type Difficulty = typeof difficulties[number];
             {d === 'all' ? 'All' : d.charAt(0).toUpperCase() + d.slice(1)}
           </button>
         ))}
+        <MultiSelect id="puzzle-category-filter" label="Category" options={categoryOptions} />
       </div>
 
       <!-- ── Grid ── -->
@@ -104,6 +115,7 @@ type Difficulty = typeof difficulties[number];
             <div
               class:list={['grid-item', 'reveal', `reveal-delay-${(i % 4) + 1}`]}
               data-difficulty={p.difficulty}
+              data-category={p.category ?? ''}
               data-title={p.title.toLowerCase()}
               data-description={p.description.toLowerCase()}
             >
@@ -132,24 +144,28 @@ type Difficulty = typeof difficulties[number];
 </Layout>
 
 <script>
-  const pills = document.querySelectorAll<HTMLButtonElement>('.filter-pill');
+  const pills = document.querySelectorAll<HTMLButtonElement>('.filter-pill[data-filter]');
   const items = document.querySelectorAll<HTMLElement>('.grid-item');
   const searchInput = document.querySelector<HTMLInputElement>('#puzzle-search');
   const noResults = document.querySelector<HTMLElement>('#puzzle-no-results');
+  const filterBar = document.querySelector<HTMLElement>('#filter-bar');
+  let selectedCategories = new Set<string>();
 
   const applyFilters = () => {
-    const activePill = document.querySelector<HTMLButtonElement>('.filter-pill.active');
+    const activePill = document.querySelector<HTMLButtonElement>('.filter-pill[data-filter].active');
     const filter = activePill?.dataset.filter ?? 'all';
     const query = (searchInput?.value ?? '').trim().toLowerCase();
     let visibleCount = 0;
 
     items.forEach(item => {
       const diff = item.dataset.difficulty ?? '';
+      const category = item.dataset.category ?? '';
       const title = item.dataset.title ?? '';
       const description = item.dataset.description ?? '';
       const matchesDifficulty = filter === 'all' || diff === filter;
+      const matchesCategory = selectedCategories.size === 0 || selectedCategories.has(category);
       const matchesSearch = query === '' || title.includes(query) || description.includes(query);
-      const isVisible = matchesDifficulty && matchesSearch;
+      const isVisible = matchesDifficulty && matchesCategory && matchesSearch;
 
       item.style.display = isVisible ? '' : 'none';
       if (isVisible) visibleCount += 1;
@@ -166,6 +182,13 @@ type Difficulty = typeof difficulties[number];
       pill.classList.add('active');
       applyFilters();
     });
+  });
+
+  filterBar?.addEventListener('multiselect-change', (event) => {
+    if (!(event instanceof CustomEvent)) return;
+    const values = Array.isArray(event.detail?.values) ? event.detail.values : [];
+    selectedCategories = new Set(values.map((value) => String(value)));
+    applyFilters();
   });
 
   searchInput?.addEventListener('input', applyFilters);

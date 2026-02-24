@@ -1,0 +1,175 @@
+---
+type MultiSelectOption = {
+  value: string;
+  label: string;
+  emoji?: string;
+};
+
+type Props = {
+  id: string;
+  label: string;
+  options: MultiSelectOption[];
+  placeholder?: string;
+};
+
+const { id, label, options, placeholder = label } = Astro.props;
+---
+
+<div
+  class="multi-select"
+  data-ms-id={id}
+  data-ms-options={JSON.stringify(options)}
+  data-ms-label={label}
+  data-ms-placeholder={placeholder}
+>
+  <button type="button" class="multi-select-trigger filter-pill" aria-expanded="false">
+    <span class="multi-select-trigger-text">{placeholder}</span>
+    <span class="multi-select-chevron" aria-hidden="true">▾</span>
+  </button>
+
+  <div class="multi-select-dropdown" hidden>
+    {options.map((option) => (
+      <label class="multi-select-option">
+        <input class="multi-select-checkbox" type="checkbox" value={option.value} />
+        {option.emoji ? <span aria-hidden="true">{option.emoji}</span> : null}
+        <span class="multi-select-option-label">{option.label}</span>
+      </label>
+    ))}
+  </div>
+</div>
+
+<script>
+  const instances = document.querySelectorAll<HTMLElement>('[data-ms-id]');
+
+  instances.forEach((root) => {
+    if (root.dataset.msInitialized === 'true') return;
+    root.dataset.msInitialized = 'true';
+
+    const selectId = root.dataset.msId ?? '';
+    const label = root.dataset.msLabel ?? '';
+    const placeholder = root.dataset.msPlaceholder ?? label;
+    const optionsRaw = root.dataset.msOptions ?? '[]';
+    const options = JSON.parse(optionsRaw) as Array<{ value: string }>;
+    const validValues = new Set(options.map((option) => option.value));
+
+    const trigger = root.querySelector<HTMLButtonElement>('.multi-select-trigger');
+    const triggerText = root.querySelector<HTMLElement>('.multi-select-trigger-text');
+    const dropdown = root.querySelector<HTMLElement>('.multi-select-dropdown');
+    const checkboxes = root.querySelectorAll<HTMLInputElement>('.multi-select-checkbox');
+
+    if (!trigger || !triggerText || !dropdown) return;
+
+    const getSelectedValues = () =>
+      Array.from(checkboxes)
+        .filter((checkbox) => checkbox.checked && validValues.has(checkbox.value))
+        .map((checkbox) => checkbox.value);
+
+    const updateTriggerState = () => {
+      const selectedValues = getSelectedValues();
+      triggerText.textContent = selectedValues.length > 0 ? `${label} (${selectedValues.length})` : placeholder;
+      trigger.classList.toggle('active', selectedValues.length > 0);
+      return selectedValues;
+    };
+
+    const emitChange = () => {
+      const selectedValues = updateTriggerState();
+      const parent = trigger.parentElement;
+      if (!parent) return;
+
+      parent.dispatchEvent(new CustomEvent('multiselect-change', {
+        bubbles: true,
+        detail: { id: selectId, values: selectedValues }
+      }));
+    };
+
+    const openDropdown = () => {
+      dropdown.hidden = false;
+      trigger.setAttribute('aria-expanded', 'true');
+    };
+
+    const closeDropdown = () => {
+      dropdown.hidden = true;
+      trigger.setAttribute('aria-expanded', 'false');
+    };
+
+    trigger.addEventListener('click', () => {
+      const isOpen = !dropdown.hidden;
+      if (isOpen) {
+        closeDropdown();
+      } else {
+        openDropdown();
+      }
+    });
+
+    checkboxes.forEach((checkbox) => {
+      checkbox.addEventListener('change', emitChange);
+    });
+
+    document.addEventListener('click', (event) => {
+      const target = event.target as Node | null;
+      if (!target || root.contains(target)) return;
+      closeDropdown();
+    });
+
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') closeDropdown();
+    });
+
+    updateTriggerState();
+  });
+</script>
+
+<style>
+  .multi-select {
+    position: relative;
+  }
+
+  .multi-select-trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .multi-select-trigger-text {
+    display: inline-block;
+  }
+
+  .multi-select-chevron {
+    color: currentColor;
+    line-height: 1;
+  }
+
+  .multi-select-dropdown {
+    position: absolute;
+    top: calc(100% + 0.375rem);
+    left: 0;
+    min-width: 200px;
+    z-index: 100;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-md);
+    padding: 0.5rem 0;
+  }
+
+  .multi-select-option {
+    padding: 0.5rem 0.875rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+  }
+
+  .multi-select-option:hover {
+    background: var(--surface);
+  }
+
+  .multi-select-checkbox {
+    accent-color: var(--accent);
+  }
+
+  .multi-select-option-label {
+    font-size: 0.875rem;
+    color: var(--text);
+  }
+</style>
