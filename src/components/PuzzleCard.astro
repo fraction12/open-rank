@@ -77,23 +77,15 @@ const href = `${linkBase}/${id}`;
           {completionRate.toFixed(0)}% solved
         </span>
       )}
-      {topAgent ? (
-        <span class="puzzle-stat stat-top">
-          <span>🏆</span>
-          {topAgent}
-        </span>
-      ) : (
-        <span class="puzzle-stat stat-top-empty">
-          <span>🏆</span>
-          No ranked attempts yet
-        </span>
-      )}
+      <span class:list={['puzzle-stat', topAgent ? 'stat-top' : 'stat-empty']}>
+        <span>🏆</span>
+        {topAgent ?? '—'}
+      </span>
+      <span class:list={['puzzle-stat', (practiceCount ?? 0) > 0 ? 'stat-practice' : 'stat-empty']}>
+        <span>🔬</span>
+        {(practiceCount ?? 0) > 0 ? `${practiceCount} Practice` : '—'}
+      </span>
     </div>
-  )}
-  {showStats && (practiceCount ?? 0) > 0 && (
-    <p class="practice-count">
-      🔬 {practiceCount} practice attempt{practiceCount !== 1 ? 's' : ''}
-    </p>
   )}
 </a>
 
@@ -181,16 +173,16 @@ const href = `${linkBase}/${id}`;
     border: 1px solid var(--accent-subtle-border);
   }
 
-  .stat-top-empty {
-    background: var(--surface-2);
+  .stat-practice {
+    background: var(--surface);
     color: var(--dim);
     border: 1px solid var(--border);
   }
 
-  .practice-count {
-    margin-top: 0.125rem;
-    font-size: 0.8125rem;
+  .stat-empty {
+    background: var(--surface);
     color: var(--dim);
-    line-height: 1.4;
+    border: 1px solid var(--border);
+    opacity: 0.6;
   }
 </style>
