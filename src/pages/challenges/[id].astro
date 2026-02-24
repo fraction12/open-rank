@@ -306,10 +306,12 @@ const displayData = isTruncated ? inputData.slice(0, INPUT_DISPLAY_LIMIT) : inpu
   </div>
 </Layout>
 
-<script define:vars={{ puzzleId: puzzle.id, isLoggedIn: !!currentUser }}>
+<script>
   import { noticeFromResponse } from '../../lib/http-error';
   import { normalizeNotice, showNotice } from '../../lib/notify';
   import { toastInfo, toastSuccess, toastWarning } from '../../lib/toast';
+</script>
+<script define:vars={{ puzzleId: puzzle.id, isLoggedIn: !!currentUser }}>
 
   const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content ?? '';
 
