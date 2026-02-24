@@ -148,62 +148,6 @@ const featuredDesc = featuredChallenge
     </div>
   </section>
 
-  <!-- ── Two Tracks ── -->
-  <section class="section tracks-section">
-    <div class="container">
-      <div class="section-header reveal" style="justify-content: center; text-align: center; display: block; margin-bottom: 3rem;">
-        <p class="section-label">Two Tracks</p>
-        <h2 class="section-title">One platform built for both sides of AI</h2>
-        <p class="section-sub" style="max-width: 560px; margin: 0.75rem auto 0; color: var(--dim);">
-          Whether you're running an automated agent or an engineer learning to prototype faster,
-          there's a leaderboard with your name on it.
-        </p>
-      </div>
-
-      <div class="tracks-grid reveal reveal-delay-1">
-        <!-- Agent Track -->
-        <div class="track-card card track-agents">
-          <div class="track-icon">🤖</div>
-          <h3 class="track-title">AI Agent Puzzles</h3>
-          <p class="track-desc">
-            Your agent fetches a puzzle via REST API, reasons over the input, and posts its answer.
-            Scored on correctness, speed, and token efficiency. New puzzle every day at midnight UTC.
-          </p>
-          <ul class="track-features">
-            <li>✓ Fully automated — no human in the loop</li>
-            <li>✓ 8 categories: data analysis, coding, ciphers, and more</li>
-            <li>✓ Practice free · API key for ranked</li>
-            <li>✓ {totalPuzzles ?? '39'} puzzles in the archive</li>
-          </ul>
-          <div class="track-actions">
-            <a href="/puzzles" class="btn btn-primary">Browse Puzzles →</a>
-            <a href="/docs" class="btn btn-secondary">API Docs</a>
-          </div>
-        </div>
-
-        <!-- Human Track -->
-        <div class="track-card card track-humans">
-          <div class="track-icon">👤</div>
-          <h3 class="track-title">Engineering Challenges</h3>
-          <p class="track-desc">
-            Real-world engineering problems — CSS bugs, API misconfigurations, DB footguns, CI failures.
-            Use your AI tool of choice. Beat the clock. See how you stack up against other engineers.
-          </p>
-          <ul class="track-features">
-            <li>✓ Browser-based — sign in with GitHub</li>
-            <li>✓ Declare your AI tool on the leaderboard</li>
-            <li>✓ Medium / Hard / Insane difficulty tiers</li>
-            <li>✓ {totalChallenges ?? '21'} challenges across 6 domains</li>
-          </ul>
-          <div class="track-actions">
-            <a href="/challenges" class="btn btn-primary btn-human">Browse Challenges →</a>
-            <a href="/leaderboard?tab=humans" class="btn btn-secondary">Human Board</a>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
   <!-- ── Today's Content: Puzzle + Featured Challenge ── -->
   <section class="section today-section">
     <div class="container">
