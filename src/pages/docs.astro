@@ -1022,8 +1022,8 @@ solveToday();`}</code></pre>
     flex-shrink: 0;
   }
 
-  .method.get  { background: #dcfce7; color: #166534; }
-  .method.post { background: #dbeafe; color: #1e40af; }
+  .method.get  { background: var(--success-subtle); color: var(--success); }
+  .method.post { background: var(--accent-subtle); color: var(--accent); }
 
   .endpoint-path {
     font-size: 1.125rem;
@@ -1079,7 +1079,7 @@ solveToday();`}</code></pre>
     text-align: center;
   }
 
-  .required { background: #fef2f2; color: #991b1b; }
+  .required { background: var(--error-subtle); color: var(--error); }
   .optional  { background: var(--surface-2); color: var(--dim); }
 
   /* ── Score table ── */
@@ -1121,7 +1121,7 @@ solveToday();`}</code></pre>
 
   .dot-blue   { background: var(--accent); }
   .dot-green  { background: var(--success); }
-  .dot-orange { background: #f97316; }
+  .dot-orange { background: var(--warning); }
 
   .score-row-pts {
     font-weight: 700;

@@ -422,7 +422,7 @@ const displayData = isTruncated ? inputData.slice(0, INPUT_DISPLAY_LIMIT) : inpu
       showNotice(normalizeNotice(err, 'Failed to start challenge. Please refresh and try again.'));
       restoreStartBtn();
       const errorEl = document.createElement('p');
-      errorEl.style.cssText = 'color:#dc2626;font-size:0.875rem;margin-top:0.75rem;';
+      errorEl.style.cssText = 'color:var(--error);font-size:0.875rem;margin-top:0.75rem;';
       errorEl.textContent = 'Failed to start challenge. Please refresh and try again.';
       startBtn.insertAdjacentElement('afterend', errorEl);
       return; // Do NOT start the timer
@@ -648,7 +648,7 @@ const displayData = isTruncated ? inputData.slice(0, INPUT_DISPLAY_LIMIT) : inpu
   .score-pill-sm {
     display: inline-block;
     padding: 0.25rem 0.75rem;
-    background: var(--surface, #f8f9fa);
+    background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 99px;
     font-size: 0.8125rem;
@@ -661,7 +661,7 @@ const displayData = isTruncated ? inputData.slice(0, INPUT_DISPLAY_LIMIT) : inpu
     font-weight: 800;
     font-variant-numeric: tabular-nums;
     letter-spacing: -0.03em;
-    color: var(--accent, #3b82f6);
+    color: var(--accent);
     line-height: 1;
     margin: 0.5rem 0 0.25rem;
   }
@@ -689,7 +689,7 @@ const displayData = isTruncated ? inputData.slice(0, INPUT_DISPLAY_LIMIT) : inpu
   .form-input {
     padding: 0.625rem 0.875rem;
     border: 1px solid var(--border);
-    border-radius: var(--radius, 8px);
+    border-radius: var(--radius);
     background: var(--bg);
     color: var(--text);
     font-size: 0.9375rem;
@@ -700,7 +700,7 @@ const displayData = isTruncated ? inputData.slice(0, INPUT_DISPLAY_LIMIT) : inpu
   }
   .form-input:focus {
     outline: none;
-    border-color: var(--accent, #3b82f6);
+    border-color: var(--accent);
     box-shadow: 0 0 0 3px rgba(59,130,246,0.15);
   }
 
@@ -711,8 +711,8 @@ const displayData = isTruncated ? inputData.slice(0, INPUT_DISPLAY_LIMIT) : inpu
 
   .variant-brief {
     border: 1px solid var(--border);
-    background: var(--surface, #f8f9fa);
-    border-radius: var(--radius, 8px);
+    background: var(--surface);
+    border-radius: var(--radius);
     padding: 0.875rem;
     margin-bottom: 1rem;
   }
@@ -741,8 +741,8 @@ const displayData = isTruncated ? inputData.slice(0, INPUT_DISPLAY_LIMIT) : inpu
   .notes-panel {
     margin: 1rem 0 1rem;
     border: 1px solid var(--border);
-    border-radius: var(--radius, 8px);
-    background: var(--surface, #f8f9fa);
+    border-radius: var(--radius);
+    background: var(--surface);
     padding: 0.625rem 0.875rem;
   }
 
@@ -761,8 +761,8 @@ const displayData = isTruncated ? inputData.slice(0, INPUT_DISPLAY_LIMIT) : inpu
     margin-bottom: 1rem;
     padding: 0.75rem 0.875rem;
     border: 1px solid var(--border);
-    border-radius: var(--radius, 8px);
-    background: var(--surface, #f8f9fa);
+    border-radius: var(--radius);
+    background: var(--surface);
   }
 
   .hint-list {
@@ -848,7 +848,7 @@ const displayData = isTruncated ? inputData.slice(0, INPUT_DISPLAY_LIMIT) : inpu
   .sidebar-more {
     display: block;
     font-size: 0.8125rem;
-    color: var(--accent, #3b82f6);
+    color: var(--accent);
     text-decoration: none;
     margin-top: 1rem;
     text-align: center;
@@ -873,7 +873,7 @@ const displayData = isTruncated ? inputData.slice(0, INPUT_DISPLAY_LIMIT) : inpu
   .entry-rank { text-align: center; font-size: 0.9rem; }
 
   .entry-login {
-    color: var(--accent, #3b82f6);
+    color: var(--accent);
     text-decoration: none;
     font-family: var(--font-mono);
     font-size: 0.8125rem;
@@ -941,9 +941,9 @@ const displayData = isTruncated ? inputData.slice(0, INPUT_DISPLAY_LIMIT) : inpu
     border-radius: 50%;
     flex-shrink: 0;
   }
-  .dot-green  { background: #22c55e; }
-  .dot-blue   { background: #3b82f6; }
-  .dot-yellow { background: #eab308; }
+  .dot-green  { background: var(--success); }
+  .dot-blue   { background: var(--accent); }
+  .dot-yellow { background: var(--warning-vivid); }
   .dim-dot    { opacity: 0.5; }
 
   /* ── Tips ── */
@@ -968,7 +968,7 @@ const displayData = isTruncated ? inputData.slice(0, INPUT_DISPLAY_LIMIT) : inpu
     content: '→';
     position: absolute;
     left: 0;
-    color: var(--accent, #3b82f6);
+    color: var(--accent);
     font-size: 0.75rem;
     top: 0.1em;
   }
@@ -980,7 +980,7 @@ const displayData = isTruncated ? inputData.slice(0, INPUT_DISPLAY_LIMIT) : inpu
   .callout-muted {
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: var(--radius, 8px);
+    border-radius: var(--radius);
     padding: 0.875rem 1rem;
     font-size: 0.9375rem;
     color: var(--dim);
@@ -1010,7 +1010,7 @@ const displayData = isTruncated ? inputData.slice(0, INPUT_DISPLAY_LIMIT) : inpu
 
   /* ── Network error in result area ── */
   .result-error {
-    color: var(--error, #dc2626);
+    color: var(--error);
     font-size: 0.9375rem;
   }
 
