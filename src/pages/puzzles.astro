@@ -69,6 +69,17 @@ type Difficulty = typeof difficulties[number];
         sub={`${puzzles.length} puzzle${puzzles.length !== 1 ? 's' : ''} available`}
       />
 
+      <div class="search-wrap">
+        <input
+          id="puzzle-search"
+          class="search-input"
+          type="search"
+          placeholder="Search puzzles..."
+          aria-label="Search puzzles"
+          autocomplete="off"
+        />
+      </div>
+
       <!-- ── Filter pills ── -->
       <div class="filter-bar" role="group" aria-label="Filter by difficulty">
         {difficulties.map(d => (
@@ -90,6 +101,8 @@ type Difficulty = typeof difficulties[number];
             <div
               class:list={['grid-item', 'reveal', `reveal-delay-${(i % 4) + 1}`]}
               data-difficulty={p.difficulty}
+              data-title={p.title.toLowerCase()}
+              data-description={p.description.toLowerCase()}
             >
               <PuzzleCard
                 id={p.id}
@@ -105,6 +118,9 @@ type Difficulty = typeof difficulties[number];
             </div>
           ))}
         </div>
+        <div id="puzzle-no-results" class="search-empty" style="display: none;">
+          <EmptyState icon="🔎" title="No results" body="Try a different search term or clear the filter." />
+        </div>
       )}
 
     </div>
@@ -114,20 +130,42 @@ type Difficulty = typeof difficulties[number];
 <script>
   const pills = document.querySelectorAll<HTMLButtonElement>('.filter-pill');
   const items = document.querySelectorAll<HTMLElement>('.grid-item');
+  const searchInput = document.querySelector<HTMLInputElement>('#puzzle-search');
+  const noResults = document.querySelector<HTMLElement>('#puzzle-no-results');
+
+  const applyFilters = () => {
+    const activePill = document.querySelector<HTMLButtonElement>('.filter-pill.active');
+    const filter = activePill?.dataset.filter ?? 'all';
+    const query = (searchInput?.value ?? '').trim().toLowerCase();
+    let visibleCount = 0;
+
+    items.forEach(item => {
+      const diff = item.dataset.difficulty ?? '';
+      const title = item.dataset.title ?? '';
+      const description = item.dataset.description ?? '';
+      const matchesDifficulty = filter === 'all' || diff === filter;
+      const matchesSearch = query === '' || title.includes(query) || description.includes(query);
+      const isVisible = matchesDifficulty && matchesSearch;
+
+      item.style.display = isVisible ? '' : 'none';
+      if (isVisible) visibleCount += 1;
+    });
+
+    if (noResults) {
+      noResults.style.display = visibleCount === 0 && items.length > 0 ? '' : 'none';
+    }
+  };
 
   pills.forEach(pill => {
     pill.addEventListener('click', () => {
       pills.forEach(p => p.classList.remove('active'));
       pill.classList.add('active');
-
-      const filter = pill.dataset.filter ?? 'all';
-
-      items.forEach(item => {
-        const diff = item.dataset.difficulty ?? '';
-        item.style.display = (filter === 'all' || diff === filter) ? '' : 'none';
-      });
+      applyFilters();
     });
   });
+
+  searchInput?.addEventListener('input', applyFilters);
+  applyFilters();
 </script>
 
 <style>
@@ -136,6 +174,30 @@ type Difficulty = typeof difficulties[number];
   }
 
   /* .page-header, .page-title, .page-sub are in global.css */
+
+  .search-wrap {
+    margin-bottom: 1rem;
+  }
+
+  .search-input {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg);
+    color: var(--text);
+    padding: 0.5rem 0.75rem;
+    font-size: 0.9375rem;
+    width: 100%;
+    max-width: 400px;
+  }
+
+  .search-input:focus {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  .search-empty {
+    margin-top: 1rem;
+  }
 
   /* ── Filter pills ── */
   .filter-bar {
