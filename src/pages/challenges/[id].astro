@@ -306,12 +306,30 @@ const displayData = isTruncated ? inputData.slice(0, INPUT_DISPLAY_LIMIT) : inpu
   </div>
 </Layout>
 
-<script>
-  import { noticeFromResponse } from '../../lib/http-error';
-  import { normalizeNotice, showNotice } from '../../lib/notify';
-  import { toastInfo, toastSuccess, toastWarning } from '../../lib/toast';
-</script>
 <script define:vars={{ puzzleId: puzzle.id, isLoggedIn: !!currentUser }}>
+  // ── Inline helpers (avoid import-in-define:vars restriction) ─────────────
+  function _toast(type, title, message) {
+    window.dispatchEvent(new CustomEvent('openrank:toast', {
+      detail: { type, title, message, id: `t-${Date.now()}`, durationMs: type === 'error' ? 0 : type === 'warning' ? 6000 : 4500, dismissible: true }
+    }));
+  }
+  function toastSuccess(t, m) { _toast('success', t, m); }
+  function toastWarning(t, m) { _toast('warning', t, m); }
+  function toastInfo(t, m)    { _toast('info', t, m); }
+  function toastError(t, m)   { _toast('error', t, m); }
+  function showNotice(n) {
+    if (n?.level === 'warning') toastWarning(n.title, n.message);
+    else if (n?.level === 'info') toastInfo(n.title, n.message);
+    else toastError(n?.title ?? 'Error', n?.message ?? 'Something went wrong.');
+  }
+  async function noticeFromResponse(res, fallback) {
+    try { const d = await res.clone().json(); return { level: 'error', title: d.error ?? 'Error', message: d.details ?? fallback }; }
+    catch { return { level: 'error', title: 'Error', message: fallback }; }
+  }
+  function normalizeNotice(err, fallback) {
+    if (err && typeof err === 'object' && 'level' in err) return err;
+    return { level: 'error', title: 'Error', message: err?.message ?? fallback };
+  }
 
   const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content ?? '';
 
