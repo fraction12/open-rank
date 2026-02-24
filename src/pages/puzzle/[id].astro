@@ -472,12 +472,23 @@ const curlPractice = `curl -X POST https://open-rank.com/api/submit \\
   const form = document.getElementById('submit-form') as HTMLFormElement;
   const btn = document.getElementById('submit-btn') as HTMLButtonElement;
   const resultEl = document.getElementById('submit-result') as HTMLElement;
+  function setBusyState(button: HTMLButtonElement | null, busyLabel: string): () => void {
+    if (!button) return () => {};
+    const originalLabel = button.textContent ?? '';
+    button.disabled = true;
+    button.setAttribute('aria-busy', 'true');
+    button.textContent = busyLabel;
+    return () => {
+      button.disabled = false;
+      button.removeAttribute('aria-busy');
+      button.textContent = originalLabel;
+    };
+  }
 
   form?.addEventListener('submit', async (e) => {
     e.preventDefault();
     if (btn.disabled) return;
-    btn.disabled = true;
-    btn.textContent = 'Submitting...';
+    const restoreSubmitBtn = setBusyState(btn, 'Submitting...');
     resultEl.innerHTML = '';
 
     const data = Object.fromEntries(new FormData(form).entries());
@@ -540,8 +551,7 @@ const curlPractice = `curl -X POST https://open-rank.com/api/submit \\
       showNotice(normalizeNotice(error, 'Network error. Please try again.'));
       resultEl.innerHTML = `<div class="alert alert-error pop-in"><span>⚠️</span><div>Network error. Please try again.</div></div>`;
     } finally {
-      btn.disabled = false;
-      btn.textContent = 'Submit Answer →';
+      restoreSubmitBtn();
     }
   });
 
@@ -558,8 +568,7 @@ const curlPractice = `curl -X POST https://open-rank.com/api/submit \\
     if (!answer) { humanResult!.textContent = 'Please enter your answer.'; return; }
     if (!ai_tool) { humanResult!.textContent = 'Please select your AI tool.'; return; }
 
-    humanBtn.textContent = 'Submitting...';
-    humanBtn.setAttribute('disabled', 'true');
+    const restoreHumanBtn = setBusyState(humanBtn, 'Submitting...');
 
     try {
       // 1. Start the challenge timer (creates/reuses a session scoped to user)
@@ -573,8 +582,7 @@ const curlPractice = `curl -X POST https://open-rank.com/api/submit \\
         const err = await startRes.json().catch(() => ({}));
         showNotice(await noticeFromResponse(startRes, err.error ?? 'Failed to start challenge. Are you signed in?'));
         humanResult!.textContent = err.error ?? 'Failed to start challenge. Are you signed in?';
-        humanBtn.textContent = 'Start & Submit Challenge';
-        humanBtn.removeAttribute('disabled');
+        restoreHumanBtn();
         return;
       }
 
@@ -594,17 +602,19 @@ const curlPractice = `curl -X POST https://open-rank.com/api/submit \\
       if (result.correct) {
         toastSuccess('Challenge solved', `Score ${result.score}/100.`);
         humanResult!.innerHTML = `✅ Correct! Score: <strong>${result.score}</strong>/100 · Speed: ${result.breakdown?.speed_bonus ?? 0}pts · Efficiency: ${result.breakdown?.efficiency_bonus ?? 0}pts`;
+        humanBtn.textContent = 'Completed';
+        humanBtn.removeAttribute('aria-busy');
       } else {
         toastInfo('Incorrect answer', 'Try again. Attempt bonus decreases after wrong submissions.');
         humanResult!.innerHTML = `❌ Incorrect. Try again — but each wrong attempt reduces your efficiency bonus.`;
+        restoreHumanBtn();
         humanBtn.textContent = 'Try Again';
-        humanBtn.removeAttribute('disabled');
       }
     } catch (error) {
       showNotice(normalizeNotice(error, 'Submission failed. Try again.'));
       humanResult!.textContent = 'Submission failed. Try again.';
+      restoreHumanBtn();
       humanBtn.textContent = 'Start & Submit Challenge';
-      humanBtn.removeAttribute('disabled');
     }
   });
 </script>

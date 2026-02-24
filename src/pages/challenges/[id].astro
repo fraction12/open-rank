@@ -361,6 +361,18 @@ const displayData = isTruncated ? inputData.slice(0, INPUT_DISPLAY_LIMIT) : inpu
   let variantHints = [];
   let hintsUsed = 0;
   let attemptCount = 0;
+  function setBusyState(button, busyLabel) {
+    if (!button) return () => {};
+    const originalLabel = button.textContent ?? '';
+    button.textContent = busyLabel;
+    button.disabled = true;
+    button.setAttribute('aria-busy', 'true');
+    return () => {
+      button.textContent = originalLabel;
+      button.disabled = false;
+      button.removeAttribute('aria-busy');
+    };
+  }
 
   function formatTime(ms) {
     const s = Math.floor(ms / 1000);
@@ -372,8 +384,7 @@ const displayData = isTruncated ? inputData.slice(0, INPUT_DISPLAY_LIMIT) : inpu
   document.getElementById('start-btn')?.addEventListener('click', async () => {
     const startBtn = document.getElementById('start-btn');
     if (startBtn?.disabled) return;
-    startBtn.textContent = 'Starting...';
-    startBtn.disabled = true;
+    const restoreStartBtn = setBusyState(startBtn, 'Starting...');
 
     try {
       const res = await fetch('/api/puzzle/start-challenge', {
@@ -409,8 +420,7 @@ const displayData = isTruncated ? inputData.slice(0, INPUT_DISPLAY_LIMIT) : inpu
       }
     } catch (err) {
       showNotice(normalizeNotice(err, 'Failed to start challenge. Please refresh and try again.'));
-      startBtn.textContent = '▶ Start Challenge';
-      startBtn.disabled = false;
+      restoreStartBtn();
       const errorEl = document.createElement('p');
       errorEl.style.cssText = 'color:#dc2626;font-size:0.875rem;margin-top:0.75rem;';
       errorEl.textContent = 'Failed to start challenge. Please refresh and try again.';
@@ -464,8 +474,7 @@ const displayData = isTruncated ? inputData.slice(0, INPUT_DISPLAY_LIMIT) : inpu
     if (!answer) { resultEl.textContent = 'Please enter your answer.'; return; }
     if (!ai_tool) { resultEl.textContent = 'Please select your AI tool.'; return; }
 
-    submitBtn.textContent = 'Submitting...';
-    submitBtn.disabled = true;
+    const restoreSubmitBtn = setBusyState(submitBtn, 'Submitting...');
     attemptCount++;
 
     try {
@@ -490,8 +499,7 @@ const displayData = isTruncated ? inputData.slice(0, INPUT_DISPLAY_LIMIT) : inpu
       if (!res.ok) {
         showNotice(await noticeFromResponse(res, result.error ?? 'Submission failed. Please try again.'));
         resultEl.innerHTML = `<span class="result-error">⚠️ ${result.error ?? 'Submission failed. Please try again.'}</span>`;
-        submitBtn.textContent = 'Submit Answer';
-        submitBtn.disabled = false;
+        restoreSubmitBtn();
         return;
       }
 
@@ -533,15 +541,13 @@ const displayData = isTruncated ? inputData.slice(0, INPUT_DISPLAY_LIMIT) : inpu
         }
         resultEl.innerHTML = '❌ Incorrect — try again.';
         toastInfo('Incorrect answer', 'Keep going. You can submit again.');
-        submitBtn.textContent = 'Submit Answer';
-        submitBtn.disabled = false;
+        restoreSubmitBtn();
       }
     } catch (err) {
       // Network / unexpected error — show visible message, re-enable submit
       showNotice(normalizeNotice(err, 'Network error. Please check your connection and try again.'));
       resultEl.innerHTML = '<span class="result-error">⚠️ Network error. Please check your connection and try again.</span>';
-      submitBtn.textContent = 'Submit Answer';
-      submitBtn.disabled = false;
+      restoreSubmitBtn();
     }
   });
 </script>
