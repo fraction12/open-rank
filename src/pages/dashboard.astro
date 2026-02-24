@@ -153,10 +153,14 @@ if (supabaseAdmin) {
 
   // ── Sign out ───────────────────────────────────────────────────────────────
   document.getElementById('signout-btn')?.addEventListener('click', async () => {
-    await fetch('/api/auth/signout', {
+    console.log('CSRF token from meta:', csrfToken);
+    const res = await fetch('/api/auth/signout', {
       method: 'POST',
       headers: { 'X-CSRF-Token': csrfToken },
     });
+    console.log('Signout response:', res.status, res.ok);
+    const text = await res.text();
+    console.log('Signout body:', text);
     window.location.href = '/';
   });
 
