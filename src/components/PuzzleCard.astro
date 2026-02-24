@@ -42,11 +42,11 @@ const categoryMeta: Record<NonNullable<PuzzleCategory>, { emoji: string; label: 
 };
 
 const catInfo = category ? categoryMeta[category] : null;
-
 const preview = description.length > 150 ? description.slice(0, 147) + '...' : description;
+const href = `${linkBase}/${id}`;
 ---
 
-<article class="puzzle-card card">
+<a href={href} class="puzzle-card card">
   <div class="puzzle-card-header">
     <div class="puzzle-card-badges">
       <Badge variant={difficulty} label={difficulty.toUpperCase()} />
@@ -63,9 +63,7 @@ const preview = description.length > 150 ? description.slice(0, 147) + '...' : d
     )}
   </div>
 
-  <h3 class="puzzle-title">
-    <a href={`${linkBase}/${id}`}>{title}</a>
-  </h3>
+  <h3 class="puzzle-title">{title}</h3>
 
   <p class="puzzle-preview">{preview}</p>
 
@@ -85,17 +83,23 @@ const preview = description.length > 150 ? description.slice(0, 147) + '...' : d
       )}
     </div>
   )}
-
-  <a href={`${linkBase}/${id}`} class="puzzle-link btn btn-primary">
-    {linkBase.startsWith('/challenges') ? 'Solve Challenge →' : 'View Puzzle →'}
-  </a>
-</article>
+</a>
 
 <style>
   .puzzle-card {
     display: flex;
     flex-direction: column;
     gap: 0.875rem;
+    text-decoration: none;
+    color: inherit;
+    cursor: pointer;
+    transition: box-shadow 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+  }
+
+  .puzzle-card:hover {
+    border-color: var(--accent-subtle-border);
+    box-shadow: var(--shadow-md);
+    transform: translateY(-1px);
   }
 
   .puzzle-card-header {
@@ -112,8 +116,6 @@ const preview = description.length > 150 ? description.slice(0, 147) + '...' : d
     flex-wrap: wrap;
   }
 
-  /* .badge-category is defined in global.css */
-
   .puzzle-date {
     font-size: 0.8125rem;
     color: var(--dim);
@@ -123,15 +125,12 @@ const preview = description.length > 150 ? description.slice(0, 147) + '...' : d
     font-size: 1.1875rem;
     font-weight: 600;
     line-height: 1.3;
-  }
-
-  .puzzle-title a {
     color: var(--text);
-    text-decoration: none;
-    transition: color 0.15s;
   }
 
-  .puzzle-title a:hover { color: var(--accent); }
+  .puzzle-card:hover .puzzle-title {
+    color: var(--accent);
+  }
 
   .puzzle-preview {
     font-size: 0.9375rem;
@@ -168,12 +167,5 @@ const preview = description.length > 150 ? description.slice(0, 147) + '...' : d
     background: var(--accent-subtle);
     color: var(--accent);
     border: 1px solid var(--accent-subtle-border);
-  }
-
-  .puzzle-link {
-    align-self: flex-start;
-    margin-top: auto;
-    font-size: 0.875rem;
-    padding: 0.5rem 1rem;
   }
 </style>
