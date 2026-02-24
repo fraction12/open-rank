@@ -1,13 +1,14 @@
 import type { APIRoute } from 'astro';
 import { supabaseAdmin, getAgentByKey, getCurrentUser } from '../../lib/supabase';
 import { saltedHash } from '../../lib/hash';
-import { computeSpeedBonus, computeEfficiencyBonus, computeHumanEfficiencyBonus } from '../../lib/scoring';
+import { computeSpeedBonus, computeEfficiencyBonus } from '../../lib/scoring';
 import { checkRateLimit } from '../../lib/rate-limit';
 import { corsHeaders } from '../../lib/cors';
 import { json, jsonError } from '../../lib/response';
 import { log } from '../../lib/logger';
 import { isUuid } from '../../lib/validation';
 import { verifyCsrfHeader } from '../../lib/csrf';
+import { computeHumanRubricScore } from '../../lib/challenge-rubric';
 
 // ── OPTIONS preflight (CORS) ─────────────────────────────────────────────────
 export const OPTIONS: APIRoute = async ({ request }) => {
@@ -36,6 +37,12 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     time_ms: selfReportedTimeMs,
     tokens_used,
     skill_used,
+    root_cause,
+    fix_plan,
+    verification_steps,
+    confidence_level,
+    hints_used,
+    variant_id,
   } = body as {
     puzzle_id?: string;
     answer?: string;
@@ -46,6 +53,12 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     time_ms?: number;
     tokens_used?: number;
     skill_used?: string;
+    root_cause?: string;
+    fix_plan?: string;
+    verification_steps?: string;
+    confidence_level?: number;
+    hints_used?: number;
+    variant_id?: string;
   };
 
   // ── Human challenge fields ───────────────────────────────
@@ -157,6 +170,18 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     return jsonError('skill_used must be a string', 400, 'INVALID_INPUT', cors);
   if (skill_used && skill_used.length > 100)
     return jsonError('skill_used too long (max 100 chars)', 400, 'INVALID_INPUT', cors);
+  if (root_cause !== undefined && (typeof root_cause !== 'string' || root_cause.length > 2000))
+    return jsonError('root_cause must be a string up to 2000 chars', 400, 'INVALID_INPUT', cors);
+  if (fix_plan !== undefined && (typeof fix_plan !== 'string' || fix_plan.length > 2000))
+    return jsonError('fix_plan must be a string up to 2000 chars', 400, 'INVALID_INPUT', cors);
+  if (verification_steps !== undefined && (typeof verification_steps !== 'string' || verification_steps.length > 2000))
+    return jsonError('verification_steps must be a string up to 2000 chars', 400, 'INVALID_INPUT', cors);
+  if (confidence_level !== undefined && (typeof confidence_level !== 'number' || confidence_level < 1 || confidence_level > 5))
+    return jsonError('confidence_level must be 1-5', 400, 'INVALID_INPUT', cors);
+  if (hints_used !== undefined && (typeof hints_used !== 'number' || hints_used < 0 || hints_used > 10))
+    return jsonError('hints_used must be 0-10', 400, 'INVALID_INPUT', cors);
+  if (variant_id !== undefined && (typeof variant_id !== 'string' || variant_id.length > 100))
+    return jsonError('variant_id must be a string up to 100 chars', 400, 'INVALID_INPUT', cors);
 
   // ── Rate limiting ────────────────────────────────────────
   const ip =
@@ -193,15 +218,20 @@ export const POST: APIRoute = async ({ request, cookies }) => {
   if (session_id && typeof session_id === 'string') {
     if (is_human && humanUserId) {
       // Human session: scoped to user_id (not api_key)
-      const { data: session } = await supabaseAdmin
+      let sessionQuery = supabaseAdmin
         .from('puzzle_sessions')
         .update({ used: true })
         .eq('id', session_id)
         .eq('used', false)
         .eq('puzzle_id', puzzle_id)
         .eq('user_id', humanUserId)
-        .select('started_at')
-        .single();
+        .select('started_at, variant_id');
+
+      if (variant_id && typeof variant_id === 'string') {
+        sessionQuery = sessionQuery.eq('variant_id', variant_id);
+      }
+
+      const { data: session } = await sessionQuery.single();
 
       if (session) {
         realTimeMs = Date.now() - new Date(session.started_at).getTime();
@@ -223,6 +253,10 @@ export const POST: APIRoute = async ({ request, cookies }) => {
         realTimeMs = Date.now() - new Date(session.started_at).getTime();
       }
     }
+  }
+
+  if (is_human && session_id && !realTimeMs) {
+    return jsonError('Invalid or expired challenge session', 400, 'INVALID_SESSION', cors);
   }
 
   // ── Check correctness ─────────────────────────────────────
@@ -265,8 +299,16 @@ export const POST: APIRoute = async ({ request, cookies }) => {
   const correctness = correct ? 50 : 0;
   const speed_bonus = correct ? computeSpeedBonus(timeForScoring, bestTimeMs) : 0;
   // Human submissions: efficiency based on attempt number; agent submissions: based on tokens
+  const humanRubric = computeHumanRubricScore({
+    attemptNumber: humanAttemptNumber,
+    rootCause: root_cause,
+    fixPlan: fix_plan,
+    verificationSteps: verification_steps,
+    confidenceLevel: confidence_level ?? null,
+    hintsUsed: hints_used ?? 0,
+  });
   const efficiency_bonus = correct
-    ? (is_human ? computeHumanEfficiencyBonus(humanAttemptNumber) : computeEfficiencyBonus(tokens_used, bestTokens))
+    ? (is_human ? humanRubric.total : computeEfficiencyBonus(tokens_used, bestTokens))
     : 0;
   const score = correctness + speed_bonus + efficiency_bonus;
 
@@ -291,6 +333,16 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       ai_tool: ai_tool ?? null,
       attempt_number: is_human ? humanAttemptNumber : null,
       user_id: is_human ? humanUserId : null,
+      root_cause: is_human ? (root_cause?.trim() || null) : null,
+      fix_plan: is_human ? (fix_plan?.trim() || null) : null,
+      verification_steps: is_human ? (verification_steps?.trim() || null) : null,
+      confidence_level: is_human ? confidence_level ?? null : null,
+      hints_used: is_human ? hints_used ?? 0 : 0,
+      variant_id: is_human ? variant_id?.trim() ?? null : null,
+      rubric_attempt_score: is_human ? humanRubric.attemptScore : 0,
+      rubric_process_score: is_human ? humanRubric.processScore : 0,
+      rubric_verification_score: is_human ? humanRubric.verificationScore : 0,
+      rubric_total_score: is_human ? humanRubric.total : 0,
     })
     .select('id')
     .single();
@@ -380,6 +432,15 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       time_ms: realTimeMs,
       skill_used: skill_used ?? null,
       breakdown: { correctness, speed_bonus, efficiency_bonus },
+      human_rubric: is_human
+        ? {
+            attempt_bonus: humanRubric.attemptScore,
+            process_bonus: humanRubric.processScore,
+            verification_bonus: humanRubric.verificationScore,
+            hints_used: hints_used ?? 0,
+            total_bonus: humanRubric.total,
+          }
+        : null,
     },
     200,
     cors,

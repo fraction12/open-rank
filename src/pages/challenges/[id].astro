@@ -139,7 +139,9 @@ const displayData = isTruncated ? inputData.slice(0, INPUT_DISPLAY_LIMIT) : inpu
                   <div class="scoring-pills">
                     <span class="score-pill-sm">✅ 50pts correctness</span>
                     <span class="score-pill-sm">⚡ up to 30pts speed</span>
-                    <span class="score-pill-sm">🎯 +20pts first attempt</span>
+                    <span class="score-pill-sm">🧠 up to 8pts process</span>
+                    <span class="score-pill-sm">🧪 up to 4pts verification</span>
+                    <span class="score-pill-sm">🎯 up to 8pts attempt bonus</span>
                   </div>
                   <button class="btn btn-primary btn-lg" id="start-btn">▶ Start Challenge</button>
                 </div>
@@ -150,6 +152,13 @@ const displayData = isTruncated ? inputData.slice(0, INPUT_DISPLAY_LIMIT) : inpu
                   <p class="timer-sub">Timer running — submit when ready</p>
                   {/* Screen-reader live region for key state announcements */}
                   <div id="sr-announcer" aria-live="polite" aria-atomic="true" class="sr-only"></div>
+
+                  <div id="variant-brief" class="variant-brief" style="display:none">
+                    <p class="variant-label">Session Variant</p>
+                    <p class="variant-title" id="variant-title">Variant</p>
+                    <p class="variant-text" id="variant-text"></p>
+                    <p class="variant-criteria" id="variant-criteria"></p>
+                  </div>
 
                   <div class="form-group">
                     <label class="form-label" for="ai_tool">AI Tool Used</label>
@@ -171,8 +180,44 @@ const displayData = isTruncated ? inputData.slice(0, INPUT_DISPLAY_LIMIT) : inpu
                       placeholder="Type your answer..." autocomplete="off" />
                     <p class="form-hint">
                       Attempt <span id="attempt-count">1</span> ·
-                      <span id="efficiency-hint">First attempt = +20pts efficiency bonus</span>
+                      <span id="efficiency-hint">First attempt = +8pts attempt bonus</span>
                     </p>
+                  </div>
+
+                  <details class="notes-panel">
+                    <summary>Structured Notes (recommended for full rubric score)</summary>
+                    <div class="notes-grid">
+                      <div class="form-group">
+                        <label class="form-label" for="root_cause">Root Cause</label>
+                        <textarea id="root_cause" class="form-input form-textarea" placeholder="What actually caused the issue?"></textarea>
+                      </div>
+                      <div class="form-group">
+                        <label class="form-label" for="fix_plan">Fix Plan</label>
+                        <textarea id="fix_plan" class="form-input form-textarea" placeholder="What exact patch are you applying and why?"></textarea>
+                      </div>
+                      <div class="form-group">
+                        <label class="form-label" for="verification_steps">Verification Steps</label>
+                        <textarea id="verification_steps" class="form-input form-textarea" placeholder="How did you verify the fix and edge cases?"></textarea>
+                      </div>
+                      <div class="form-group">
+                        <label class="form-label" for="confidence_level">Confidence</label>
+                        <select id="confidence_level" class="form-input">
+                          <option value="">Select confidence...</option>
+                          <option value="1">1 - Low</option>
+                          <option value="2">2</option>
+                          <option value="3">3 - Medium</option>
+                          <option value="4">4</option>
+                          <option value="5">5 - High</option>
+                        </select>
+                      </div>
+                    </div>
+                  </details>
+
+                  <div class="hints-panel">
+                    <p class="form-label">Coach Mode</p>
+                    <p class="form-hint">Need help? Reveal hints one by one. Each hint slightly reduces rubric bonus.</p>
+                    <button type="button" class="btn btn-secondary btn-sm" id="hint-btn">Reveal next hint</button>
+                    <ul id="hint-list" class="hint-list"></ul>
                   </div>
 
                   <button class="btn btn-primary" id="submit-btn">Submit Answer</button>
@@ -238,9 +283,9 @@ const displayData = isTruncated ? inputData.slice(0, INPUT_DISPLAY_LIMIT) : inpu
             <ul class="scoring-list">
               <li><span class="dot dot-green"></span><span>Correctness</span><span class="score-max">50pts</span></li>
               <li><span class="dot dot-blue"></span><span>Speed bonus</span><span class="score-max">up to 30</span></li>
-              <li><span class="dot dot-yellow"></span><span>1st attempt</span><span class="score-max">+20pts</span></li>
-              <li><span class="dot dot-yellow dim-dot"></span><span>2nd attempt</span><span class="score-max">+10pts</span></li>
-              <li><span class="dot dot-yellow dim-dot"></span><span>3rd attempt</span><span class="score-max">+5pts</span></li>
+              <li><span class="dot dot-yellow"></span><span>Process quality</span><span class="score-max">up to 8</span></li>
+              <li><span class="dot dot-yellow dim-dot"></span><span>Verification quality</span><span class="score-max">up to 4</span></li>
+              <li><span class="dot dot-yellow dim-dot"></span><span>Attempt bonus</span><span class="score-max">up to 8</span></li>
             </ul>
           </div>
 
@@ -306,6 +351,9 @@ const displayData = isTruncated ? inputData.slice(0, INPUT_DISPLAY_LIMIT) : inpu
   let timerInterval = null;
   let startTimestamp = null;
   let sessionId = null;
+  let variantId = null;
+  let variantHints = [];
+  let hintsUsed = 0;
   let attemptCount = 0;
 
   function formatTime(ms) {
@@ -334,6 +382,24 @@ const displayData = isTruncated ? inputData.slice(0, INPUT_DISPLAY_LIMIT) : inpu
         throw new Error('No session returned');
       }
       sessionId = data.session_id;
+      variantId = data.variant?.id ?? null;
+      variantHints = Array.isArray(data.variant?.hint_track) ? data.variant.hint_track : [];
+      hintsUsed = 0;
+
+      const variantEl = document.getElementById('variant-brief');
+      const variantTitle = document.getElementById('variant-title');
+      const variantText = document.getElementById('variant-text');
+      const variantCriteria = document.getElementById('variant-criteria');
+      const hintList = document.getElementById('hint-list');
+      const hintBtn = document.getElementById('hint-btn');
+      if (hintList) hintList.innerHTML = '';
+      if (hintBtn) hintBtn.removeAttribute('disabled');
+      if (variantId && variantEl && variantTitle && variantText && variantCriteria) {
+        variantTitle.textContent = data.variant?.title ?? 'Session Variant';
+        variantText.textContent = data.variant?.brief ?? '';
+        variantCriteria.textContent = `Success criteria: ${data.variant?.success_criteria ?? 'Ship a safe and verifiable fix.'}`;
+        variantEl.style.display = 'block';
+      }
     } catch (err) {
       console.error('Failed to start challenge:', err);
       startBtn.textContent = '▶ Start Challenge';
@@ -359,10 +425,31 @@ const displayData = isTruncated ? inputData.slice(0, INPUT_DISPLAY_LIMIT) : inpu
     }, 100);
   });
 
+  document.getElementById('hint-btn')?.addEventListener('click', () => {
+    const hintList = document.getElementById('hint-list');
+    if (!hintList) return;
+    if (hintsUsed >= variantHints.length || hintsUsed >= 3) return;
+
+    const li = document.createElement('li');
+    li.textContent = variantHints[hintsUsed] ?? 'Re-check assumptions and validate edge cases.';
+    hintList.appendChild(li);
+    hintsUsed += 1;
+
+    if (hintsUsed >= 3 || hintsUsed >= variantHints.length) {
+      const btn = document.getElementById('hint-btn');
+      if (btn) btn.setAttribute('disabled', 'true');
+    }
+  });
+
   // ── Submit ───────────────────────────────────────────────────────────────
   document.getElementById('submit-btn')?.addEventListener('click', async () => {
     const answer = document.getElementById('challenge-answer')?.value?.trim();
     const ai_tool = document.getElementById('ai_tool')?.value;
+    const rootCause = document.getElementById('root_cause')?.value?.trim() ?? '';
+    const fixPlan = document.getElementById('fix_plan')?.value?.trim() ?? '';
+    const verificationSteps = document.getElementById('verification_steps')?.value?.trim() ?? '';
+    const confidenceRaw = document.getElementById('confidence_level')?.value ?? '';
+    const confidenceLevel = confidenceRaw ? Number.parseInt(confidenceRaw, 10) : undefined;
     const resultEl = document.getElementById('challenge-result');
     const submitBtn = document.getElementById('submit-btn');
 
@@ -382,7 +469,12 @@ const displayData = isTruncated ? inputData.slice(0, INPUT_DISPLAY_LIMIT) : inpu
           answer,
           session_id: sessionId,
           ai_tool,
-          is_human: true,
+          variant_id: variantId,
+          hints_used: hintsUsed,
+          root_cause: rootCause || undefined,
+          fix_plan: fixPlan || undefined,
+          verification_steps: verificationSteps || undefined,
+          confidence_level: Number.isFinite(confidenceLevel) ? confidenceLevel : undefined,
         }),
       });
       const result = await res.json();
@@ -404,20 +496,23 @@ const displayData = isTruncated ? inputData.slice(0, INPUT_DISPLAY_LIMIT) : inpu
           `Solved with ${toolName} in ${formatTime(elapsed)} — Score: ${result.score}/100`;
 
         const b = result.breakdown ?? {};
+        const hr = result.human_rubric ?? {};
         document.getElementById('score-breakdown').innerHTML = [
           `<span class="score-pill-sm">✅ ${b.correctness ?? 50}pts correctness</span>`,
           `<span class="score-pill-sm">⚡ ${b.speed_bonus ?? 0}pts speed</span>`,
-          `<span class="score-pill-sm">🎯 ${b.efficiency_bonus ?? 0}pts efficiency</span>`,
+          `<span class="score-pill-sm">🧠 ${hr.process_bonus ?? 0}pts process</span>`,
+          `<span class="score-pill-sm">🧪 ${hr.verification_bonus ?? 0}pts verification</span>`,
+          `<span class="score-pill-sm">🎯 ${hr.attempt_bonus ?? 0}pts attempt</span>`,
         ].join('');
       } else {
         const nextAttempt = attemptCount + 1;
         document.getElementById('attempt-count').textContent = String(nextAttempt);
-        const hints = ['', '+20pts', '+10pts', '+5pts'];
+        const hints = ['', '+8pts', '+4pts', '+2pts'];
         const hintEl = document.getElementById('efficiency-hint');
         if (nextAttempt <= 3) {
-          hintEl.textContent = `Next attempt bonus: ${hints[nextAttempt]} efficiency`;
+          hintEl.textContent = `Next attempt bonus: ${hints[nextAttempt]} attempt`;
         } else {
-          hintEl.textContent = 'No efficiency bonus remaining';
+          hintEl.textContent = 'No attempt bonus remaining';
         }
         resultEl.innerHTML = '❌ Incorrect — try again.';
         submitBtn.textContent = 'Submit Answer';
@@ -582,6 +677,75 @@ const displayData = isTruncated ? inputData.slice(0, INPUT_DISPLAY_LIMIT) : inpu
     outline: none;
     border-color: var(--accent, #3b82f6);
     box-shadow: 0 0 0 3px rgba(59,130,246,0.15);
+  }
+
+  .form-textarea {
+    min-height: 84px;
+    resize: vertical;
+  }
+
+  .variant-brief {
+    border: 1px solid var(--border);
+    background: var(--surface, #f8f9fa);
+    border-radius: var(--radius, 8px);
+    padding: 0.875rem;
+    margin-bottom: 1rem;
+  }
+
+  .variant-label {
+    font-size: 0.75rem;
+    color: var(--dim);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin: 0 0 0.25rem;
+  }
+
+  .variant-title {
+    margin: 0;
+    font-weight: 700;
+    color: var(--text);
+  }
+
+  .variant-text,
+  .variant-criteria {
+    margin: 0.35rem 0 0;
+    font-size: 0.875rem;
+    color: var(--dim);
+  }
+
+  .notes-panel {
+    margin: 1rem 0 1rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius, 8px);
+    background: var(--surface, #f8f9fa);
+    padding: 0.625rem 0.875rem;
+  }
+
+  .notes-panel summary {
+    cursor: pointer;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .notes-grid {
+    margin-top: 0.875rem;
+  }
+
+  .hints-panel {
+    margin-bottom: 1rem;
+    padding: 0.75rem 0.875rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius, 8px);
+    background: var(--surface, #f8f9fa);
+  }
+
+  .hint-list {
+    margin: 0.75rem 0 0;
+    padding-left: 1.15rem;
+    color: var(--dim);
+    font-size: 0.875rem;
+    line-height: 1.6;
   }
 
   .form-hint {

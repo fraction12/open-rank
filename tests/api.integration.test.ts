@@ -305,6 +305,41 @@ describe('API integration: release gating and duplicate handling', () => {
     expect(body.code).toBe('INVALID_INPUT');
   });
 
+  it('POST /api/puzzle/start-challenge returns session and variant', async () => {
+    state.getCurrentUser.mockResolvedValue({ id: 'user-1' });
+    state.supabaseAdmin = createSupabaseAdminMock((query) => {
+      if (query.table === 'puzzles' && query.terminal === 'single') {
+        return { data: { id: validPuzzleId, release_date: '2026-01-01' }, error: null };
+      }
+
+      if (query.table === 'puzzle_sessions' && query.op === 'select' && query.terminal === 'single') {
+        return { data: null, error: { message: 'not found' } };
+      }
+
+      if (query.table === 'puzzle_sessions' && query.op === 'insert' && query.terminal === 'single') {
+        return { data: { id: validSessionId, variant_id: 'minimal-safe-fix', variant_title: 'Minimal Safe Fix' }, error: null };
+      }
+
+      return { data: null, error: null };
+    });
+
+    const { POST } = await import('../src/pages/api/puzzle/start-challenge.ts');
+    const response = await POST({
+      request: new Request('http://localhost/api/puzzle/start-challenge', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': 'token-1' },
+        body: JSON.stringify({ puzzle_id: validPuzzleId }),
+      }),
+      cookies: cookieStore('token-1') as never,
+    } as never);
+
+    const body = await readJson(response);
+    expect(response.status).toBe(201);
+    expect(body.session_id).toBe(validSessionId);
+    expect(typeof body.variant).toBe('object');
+    expect((body.variant as { id: string }).id).toBe('minimal-safe-fix');
+  });
+
   it('GET /api/leaderboard/:puzzleId rejects invalid UUID', async () => {
     const { GET } = await import('../src/pages/api/leaderboard/[puzzleId].ts');
     const response = await GET({

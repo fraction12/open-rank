@@ -5,6 +5,7 @@ import { json, jsonError } from '../../../lib/response';
 import { log } from '../../../lib/logger';
 import { verifyCsrfHeader } from '../../../lib/csrf';
 import { isUuid } from '../../../lib/validation';
+import { selectChallengeVariant } from '../../../lib/challenge-variants';
 
 export const OPTIONS: APIRoute = async ({ request }) => {
   return new Response(null, { status: 204, headers: corsHeaders(request) });
@@ -17,7 +18,7 @@ export const OPTIONS: APIRoute = async ({ request }) => {
  *
  * Creates a puzzle_session scoped to user_id (not api_key).
  * If an unused session already exists for this user+puzzle, returns it (prevents farming).
- * Returns: { session_id }
+ * Returns: { session_id, variant }
  */
 export const POST: APIRoute = async ({ request, cookies }) => {
   const cors = corsHeaders(request);
@@ -66,7 +67,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
   // Prevents farming: if a session exists for this user+puzzle, reuse it
   const { data: existingSession } = await supabaseAdmin
     .from('puzzle_sessions')
-    .select('id')
+    .select('id, variant_id, variant_title')
     .eq('puzzle_id', puzzle_id)
     .eq('user_id', currentUser.id)
     .eq('used', false)
@@ -75,8 +76,20 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     .single();
 
   if (existingSession) {
-    return json({ session_id: existingSession.id }, 200, cors);
+    const variant = selectChallengeVariant(`${puzzle_id}:${currentUser.id}:${existingSession.id}`);
+    return json({
+      session_id: existingSession.id,
+      variant: {
+        id: existingSession.variant_id ?? variant.id,
+        title: existingSession.variant_title ?? variant.title,
+        brief: variant.brief,
+        success_criteria: variant.successCriteria,
+        hint_track: variant.hintTrack,
+      },
+    }, 200, cors);
   }
+
+  const variant = selectChallengeVariant(`${puzzle_id}:${currentUser.id}:${Date.now()}`);
 
   // ── Create new session (via supabaseAdmin — RLS locked) ───────────────────
   const { data: newSession, error: insertErr } = await supabaseAdmin
@@ -86,8 +99,10 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       user_id: currentUser.id,
       started_at: new Date().toISOString(),
       used: false,
+      variant_id: variant.id,
+      variant_title: variant.title,
     })
-    .select('id')
+    .select('id, variant_id, variant_title')
     .single();
 
   if (insertErr || !newSession) {
@@ -95,5 +110,14 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     return jsonError('Failed to create challenge session', 500, 'INSERT_FAILED', cors);
   }
 
-  return json({ session_id: newSession.id }, 201, cors);
+  return json({
+    session_id: newSession.id,
+    variant: {
+      id: newSession.variant_id ?? variant.id,
+      title: newSession.variant_title ?? variant.title,
+      brief: variant.brief,
+      success_criteria: variant.successCriteria,
+      hint_track: variant.hintTrack,
+    },
+  }, 201, cors);
 };
