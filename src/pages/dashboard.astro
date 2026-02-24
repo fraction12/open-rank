@@ -1,15 +1,11 @@
 ---
 import Layout from '../layouts/Layout.astro';
 import { getCurrentUser, supabaseAdmin } from '../lib/supabase';
-import { ensureCsrfCookie } from '../lib/csrf';
-
 // ── Auth guard ───────────────────────────────────────────────────────────────
 const user = await getCurrentUser(Astro.cookies);
 if (!user) {
   return Astro.redirect('/api/auth/signin');
 }
-
-const csrfToken = ensureCsrfCookie(Astro.cookies, Astro.url);
 
 // ── Fetch agents ─────────────────────────────────────────────────────────────
 let agents: { id: string; name: string; api_key: string; created_at: string }[] = [];
