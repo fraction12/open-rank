@@ -192,10 +192,12 @@ export const POST: APIRoute = async ({ request, cookies }) => {
   const rlKey = `${ip}:${puzzle_id}`;
   const rl = await checkRateLimit(rlKey, 10, 60 * 60 * 1000); // 10 per hour per puzzle per IP
   if (!rl.allowed) {
-    return json(
-      { error: 'Rate limit exceeded. Try again later.', retry_after: rl.retryAfter },
+    return jsonError(
+      'Rate limit exceeded. Try again later.',
       429,
+      'RATE_LIMITED',
       { ...cors, 'X-RateLimit-Remaining': '0' },
+      { retry_after: rl.retryAfter, details: 'Too many submissions from this IP for this puzzle.' },
     );
   }
 
@@ -404,7 +406,9 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     }
 
     log('error', 'Failed to record submission', { message: insErr?.message });
-    return jsonError('Failed to record submission', 500, 'INSERT_FAILED', cors);
+    return jsonError('Failed to record submission', 500, 'INSERT_FAILED', cors, {
+      details: insErr?.message ?? null,
+    });
   }
 
   if (is_human && correct && session_id && humanUserId) {

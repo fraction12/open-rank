@@ -12,5 +12,15 @@ export function jsonError(
   headers: Record<string, string> = {},
   extra: Record<string, unknown> = {},
 ): Response {
-  return json({ error: message, code, ...extra }, status, headers);
+  return json(
+    {
+      error: message,
+      message,
+      code,
+      details: extra.details ?? null,
+      ...extra,
+    },
+    status,
+    headers,
+  );
 }

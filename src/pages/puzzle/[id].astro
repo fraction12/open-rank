@@ -475,6 +475,7 @@ const curlPractice = `curl -X POST https://open-rank.com/api/submit \\
 
   form?.addEventListener('submit', async (e) => {
     e.preventDefault();
+    if (btn.disabled) return;
     btn.disabled = true;
     btn.textContent = 'Submitting...';
     resultEl.innerHTML = '';
@@ -550,6 +551,7 @@ const curlPractice = `curl -X POST https://open-rank.com/api/submit \\
   const puzzleId = (document.querySelector('input[name="puzzle_id"]') as HTMLInputElement | null)?.value;
 
   humanBtn?.addEventListener('click', async () => {
+    if (humanBtn.hasAttribute('disabled')) return;
     const answer = (document.getElementById('human_answer') as HTMLInputElement | null)?.value?.trim();
     const ai_tool = (document.getElementById('ai_tool') as HTMLSelectElement | null)?.value;
 

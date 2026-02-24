@@ -8,7 +8,7 @@ type QueryResult = {
 
 type QueryInput = {
   table: string;
-  op: 'select' | 'insert' | 'update';
+  op: 'select' | 'insert' | 'update' | 'delete';
   terminal: 'single' | 'maybeSingle' | 'many' | 'head';
   columns?: string;
   filters: Array<{ kind: string; column?: string; value?: unknown }>;
@@ -48,6 +48,11 @@ class QueryBuilder {
   update(values: Record<string, unknown>) {
     this.query.op = 'update';
     this.query.values = values;
+    return this;
+  }
+
+  delete() {
+    this.query.op = 'delete';
     return this;
   }
 
@@ -286,6 +291,8 @@ describe('API integration: release gating and duplicate handling', () => {
     const body = await readJson(response);
     expect(response.status).toBe(403);
     expect(body.code).toBe('CSRF_INVALID');
+    expect(body.message).toBe('Invalid CSRF token');
+    expect(body.details).toBeNull();
   });
 
   it('POST /api/puzzle/start-challenge rejects invalid UUID', async () => {
@@ -338,6 +345,49 @@ describe('API integration: release gating and duplicate handling', () => {
     expect(body.session_id).toBe(validSessionId);
     expect(typeof body.variant).toBe('object');
     expect((body.variant as { id: string }).id).toBe('minimal-safe-fix');
+  });
+
+  it('DELETE /api/agents/:id succeeds for owner with valid CSRF', async () => {
+    state.getCurrentUser.mockResolvedValue({ id: 'user-1' });
+    const queries: QueryInput[] = [];
+    state.supabaseAdmin = createSupabaseAdminMock((query) => {
+      queries.push({ ...query, filters: [...query.filters] });
+      return { data: null, error: null };
+    });
+
+    const { DELETE } = await import('../src/pages/api/agents/[id].ts');
+    const response = await DELETE({
+      params: { id: validApiKey },
+      request: new Request(`http://localhost/api/agents/${validApiKey}`, {
+        method: 'DELETE',
+        headers: { 'X-CSRF-Token': 'token-1' },
+      }),
+      cookies: cookieStore('token-1') as never,
+    } as never);
+
+    expect(response.status).toBe(204);
+    const deleteQuery = queries.find(q => q.table === 'agents' && q.op === 'delete');
+    expect(deleteQuery).toBeTruthy();
+    expect(deleteQuery?.filters.some(f => f.kind === 'eq' && f.column === 'id')).toBe(true);
+    expect(deleteQuery?.filters.some(f => f.kind === 'eq' && f.column === 'user_id')).toBe(true);
+  });
+
+  it('POST /api/auth/signout rejects missing CSRF token', async () => {
+    const { POST } = await import('../src/pages/api/auth/signout.ts');
+    const response = await POST({
+      request: new Request('http://localhost/api/auth/signout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      }),
+      cookies: cookieStore() as never,
+      redirect: vi.fn(),
+    } as never);
+
+    const body = await readJson(response);
+    expect(response.status).toBe(403);
+    expect(body.code).toBe('CSRF_INVALID');
+    expect(body.message).toBe('Invalid CSRF token');
   });
 
   it('GET /api/leaderboard/:puzzleId rejects invalid UUID', async () => {

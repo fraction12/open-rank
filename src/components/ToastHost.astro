@@ -26,6 +26,12 @@
       active.delete(id);
     }
 
+    function dismissLatestToast(): void {
+      const ids = Array.from(active.keys());
+      const latestId = ids[ids.length - 1];
+      if (latestId) dismissToast(latestId);
+    }
+
     function trimQueue(max = 5): void {
       if (active.size <= max) return;
       const oldestId = active.keys().next().value;
@@ -74,6 +80,10 @@
       const customEvent = event as CustomEvent<ToastDetail>;
       if (!customEvent.detail) return;
       pushToast(customEvent.detail);
+    });
+
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') dismissLatestToast();
     });
   }
 </script>
@@ -166,6 +176,14 @@
       right: 1rem;
       top: calc(var(--nav-height) + 0.6rem);
       width: auto;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .toast,
+    .toast-exit {
+      animation: none;
+      transition: none;
     }
   }
 </style>

@@ -56,7 +56,9 @@ export const POST: APIRoute = async ({ cookies, request }) => {
 
   if (error) {
     console.error('[agents POST] insert failed:', error.message);
-    return jsonError('Failed to create agent', 500, 'INSERT_FAILED', cors);
+    return jsonError('Failed to create agent', 500, 'INSERT_FAILED', cors, {
+      details: error.message,
+    });
   }
   return json(data, 201, cors);
 };

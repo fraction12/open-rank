@@ -157,6 +157,9 @@ if (supabaseAdmin) {
 
   // ── Sign out ───────────────────────────────────────────────────────────────
   document.getElementById('signout-btn')?.addEventListener('click', async () => {
+    const signoutBtn = document.getElementById('signout-btn') as HTMLButtonElement | null;
+    if (signoutBtn?.disabled) return;
+    if (signoutBtn) signoutBtn.disabled = true;
     try {
       const res = await fetch('/api/auth/signout', {
         method: 'POST',
@@ -169,6 +172,7 @@ if (supabaseAdmin) {
       window.location.href = '/';
     } catch (error) {
       showNotice(normalizeNotice(error, 'Failed to sign out. Please try again.'));
+      if (signoutBtn) signoutBtn.disabled = false;
     }
   });
 
@@ -200,9 +204,12 @@ if (supabaseAdmin) {
   // ── Delete agent ───────────────────────────────────────────────────────────
   document.querySelectorAll('.delete-agent-btn').forEach(btn => {
     btn.addEventListener('click', async () => {
+      const button = btn as HTMLButtonElement;
+      if (button.disabled) return;
       const agentId = (btn as HTMLElement).dataset.agentId;
       const agentName = (btn as HTMLElement).dataset.agentName;
       if (!confirm(`Delete agent "${agentName}"? This cannot be undone.`)) return;
+      button.disabled = true;
 
       const res = await fetch(`/api/agents/${agentId}`, {
         method: 'DELETE',
@@ -215,6 +222,7 @@ if (supabaseAdmin) {
         toastSuccess('Agent deleted', `Removed "${agentName}" from your account.`);
       } else {
         showNotice(await noticeFromResponse(res, 'Failed to delete agent. Please try again.'));
+        button.disabled = false;
       }
     });
   });
@@ -226,9 +234,12 @@ if (supabaseAdmin) {
 
   addForm?.addEventListener('submit', async (e) => {
     e.preventDefault();
+    const submitBtn = addForm.querySelector('button[type="submit"]') as HTMLButtonElement | null;
+    if (submitBtn?.disabled) return;
     addError.style.display = 'none';
     const name = nameInput.value.trim();
     if (!name) return;
+    if (submitBtn) submitBtn.disabled = true;
 
     try {
       const res = await fetch('/api/agents', {
@@ -253,6 +264,8 @@ if (supabaseAdmin) {
       showNotice(notice);
       addError.textContent = notice.message;
       addError.style.display = 'block';
+    } finally {
+      if (submitBtn) submitBtn.disabled = false;
     }
   });
 </script>

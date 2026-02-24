@@ -150,7 +150,9 @@ export const POST: APIRoute = async ({ request, cookies }) => {
 
   if (insertErr || !newSession) {
     log('error', 'Failed to create puzzle session', { message: insertErr?.message });
-    return jsonError('Failed to create challenge session', 500, 'INSERT_FAILED', cors);
+    return jsonError('Failed to create challenge session', 500, 'INSERT_FAILED', cors, {
+      details: insertErr?.message ?? null,
+    });
   }
 
   return json({

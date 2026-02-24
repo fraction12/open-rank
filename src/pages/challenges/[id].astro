@@ -371,6 +371,7 @@ const displayData = isTruncated ? inputData.slice(0, INPUT_DISPLAY_LIMIT) : inpu
   // ── Start ────────────────────────────────────────────────────────────────
   document.getElementById('start-btn')?.addEventListener('click', async () => {
     const startBtn = document.getElementById('start-btn');
+    if (startBtn?.disabled) return;
     startBtn.textContent = 'Starting...';
     startBtn.disabled = true;
 
@@ -458,6 +459,7 @@ const displayData = isTruncated ? inputData.slice(0, INPUT_DISPLAY_LIMIT) : inpu
     const confidenceLevel = confidenceRaw ? Number.parseInt(confidenceRaw, 10) : undefined;
     const resultEl = document.getElementById('challenge-result');
     const submitBtn = document.getElementById('submit-btn');
+    if (submitBtn?.disabled) return;
 
     if (!answer) { resultEl.textContent = 'Please enter your answer.'; return; }
     if (!ai_tool) { resultEl.textContent = 'Please select your AI tool.'; return; }
