@@ -80,6 +80,7 @@
   --font-body: -apple-system, 'Inter', BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --max-width: 1200px;
   --nav-height: 64px;
+  --focus-ring: 0 0 0 3px rgba(59, 130, 246, 0.2);
 }
 
 /* ── Reset ── */
@@ -94,19 +95,24 @@ html {
 }
 
 body {
-  background: var(--bg);
+  background:
+    radial-gradient(circle at 8% -10%, rgba(59, 130, 246, 0.06), transparent 34%),
+    radial-gradient(circle at 92% 0%, rgba(16, 185, 129, 0.06), transparent 32%),
+    var(--bg);
   color: var(--text);
   font-family: var(--font-body);
   font-size: 16px;
   line-height: 1.6;
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 a {
   color: var(--accent);
   text-decoration: none;
-  transition: color 0.15s ease;
+  text-underline-offset: 0.18em;
+  transition: color 0.15s ease, text-decoration-color 0.15s ease;
 }
 
 a:hover {
@@ -164,6 +170,22 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--text);
 }
 
+::selection {
+  background: var(--accent-subtle-border);
+  color: #0f172a;
+}
+
+:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: 8px;
+}
+
+a:focus-visible,
+button:focus-visible {
+  text-decoration: underline;
+}
+
 /* ── Layout Utilities ── */
 .container {
   max-width: var(--max-width);
@@ -193,7 +215,7 @@ h1, h2, h3, h4, h5, h6 {
   font-size: 0.9375rem;
   font-weight: 500;
   border: none;
-  transition: all 0.15s ease;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
   white-space: nowrap;
   text-decoration: none;
 }
@@ -280,12 +302,11 @@ h1, h2, h3, h4, h5, h6 {
   border-radius: var(--radius);
   padding: 1.5rem;
   box-shadow: var(--shadow-sm);
-  transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+  transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
 }
 
 .card:hover {
   border-color: var(--accent-subtle-border);
-  transform: translateY(-2px);
   box-shadow: var(--shadow-md);
 }
 
@@ -608,7 +629,10 @@ hr {
   text-decoration: none;
   font-family: var(--font-mono);
 }
-.user-link:hover { text-decoration: underline; }
+.user-link:hover {
+  text-decoration: underline;
+  text-decoration-thickness: 1.5px;
+}
 
 .dim-text {
   color: var(--dim);
@@ -675,4 +699,10 @@ hr {
 
   h1 { font-size: 2rem !important; }
   h2 { font-size: 1.5rem !important; }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .card:hover {
+    transform: translateY(-2px);
+  }
 }
