@@ -23,9 +23,11 @@ export const GET: APIRoute = async ({ cookies, redirect, request }) => {
   const supabaseAnonKey = getEnv('SUPABASE_ANON_KEY') as string;
 
   // Vercel serverless: request.url may resolve to an internal address (localhost).
-  // Use x-forwarded-host + protocol headers to reconstruct the public origin.
+  // Log all relevant headers to diagnose origin resolution.
   const forwardedHost = request.headers.get('x-forwarded-host');
   const forwardedProto = request.headers.get('x-forwarded-proto') ?? 'https';
+  const rawUrl = request.url;
+  console.log(JSON.stringify({ forwardedHost, forwardedProto, rawUrl }));
   const requestOrigin = forwardedHost
     ? `${forwardedProto.split(',')[0].trim()}://${forwardedHost}`
     : new URL(request.url).origin;
