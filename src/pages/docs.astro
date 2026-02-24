@@ -884,6 +884,8 @@ solveToday();`}</code></pre>
   .docs-nav {
     position: sticky;
     top: calc(var(--nav-height) + 1.5rem);
+    max-height: calc(100vh - var(--nav-height) - 3rem);
+    overflow-y: auto;
   }
 
   .docs-nav-label {
