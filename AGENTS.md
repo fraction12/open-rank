@@ -45,3 +45,38 @@
 - Never commit secrets. Use `.env.local` for local development only.
 - Required runtime envs include: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `ANSWER_SALT`.
 - For cookie-authenticated write endpoints, include CSRF token (`X-CSRF-Token` or `csrf_token` form field).
+
+## Astro-Specific Rules (critical — read before writing any script or auth code)
+
+### Script blocks
+- `<script define:vars={{ ... }}>` blocks are compiled as **plain JavaScript** — no TypeScript allowed inside them. Never use `as Type`, `as HTMLElement`, type unions, or any TS syntax. Use plain JS equivalents:
+  - ❌ `(el as HTMLMetaElement).content`
+  - ✅ `el?.content`
+  - ❌ `document.getElementById('x') as HTMLFormElement`
+  - ✅ `document.getElementById('x')`
+- Regular `<script>` blocks (without `define:vars`) DO support TypeScript — casts are fine there.
+
+### Fetch calls to API routes
+- All POST fetch calls must include `'Content-Type': 'application/json'` in headers. Without it, Astro's built-in CSRF middleware treats the request as a form POST and blocks it with 403.
+- Always include `'X-CSRF-Token': csrfToken` alongside Content-Type.
+- Correct pattern:
+  ```js
+  fetch('/api/...', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+    body: JSON.stringify({ ... }),
+  });
+  ```
+
+### CSRF token ownership
+- The Layout (`src/layouts/Layout.astro`) owns the CSRF token — it calls `ensureCsrfCookie()` and injects `<meta name="csrf-token">`.
+- **Never** call `ensureCsrfCookie()` again in individual pages — it can generate a mismatched token and break all CSRF verification.
+- Always read the token client-side from the meta tag: `document.querySelector('meta[name="csrf-token"]')?.content ?? ''`
+
+### Signout and auth flows
+- Never use native HTML `<form method="POST">` for signout or any auth action — Vercel/Astro blocks cross-site form POSTs with 403. Use `fetch()` instead.
+
+### Vercel + Supabase OAuth
+- `request.url` in Vercel serverless functions resolves to an **internal localhost URL**, not the public domain. Never use `new URL(request.url).origin` to build OAuth `redirectTo` URLs.
+- The public origin is set in `astro.config.mjs` (`site: 'https://open-rank.com'`) and hardcoded in `src/pages/api/auth/signin.ts`.
+- GitHub OAuth App callback URL must point to **Supabase** (`https://<project>.supabase.co/auth/v1/callback`), not our app. Supabase handles the GitHub exchange and then redirects to our `/api/auth/callback`.
